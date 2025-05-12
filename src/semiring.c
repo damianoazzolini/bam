@@ -110,17 +110,17 @@ double *transformation_function_credal(double *pair) {
     return res;
 }
 
-// packed tasks
-second_level_amc_t *credal_semantics_inference() {
-    second_level_amc_t *semiring = malloc(sizeof(second_level_amc_t));
-    semiring->inner_layer = malloc(sizeof(amc_layer_t));
-    // semiring->inner_layer.semiring = add;
-    // semiring->inner_layer->semiring = add_two();
+// // packed tasks
+// second_level_amc_t *credal_semantics_inference() {
+//     second_level_amc_t *semiring = malloc(sizeof(second_level_amc_t));
+//     semiring->inner_layer = malloc(sizeof(amc_layer_t));
+//     // semiring->inner_layer.semiring = add;
+//     // semiring->inner_layer->semiring = add_two();
 
-    semiring->outer_layer = malloc(sizeof(amc_layer_t));
-    semiring->outer_layer->semiring = prob_two_semiring();
-    // semiring->outer_layer->semiring = prob_two_semiring();
+//     semiring->outer_layer = malloc(sizeof(amc_layer_t));
+//     semiring->outer_layer->semiring = prob_two_semiring();
+//     // semiring->outer_layer->semiring = prob_two_semiring();
 
-    semiring->transformation_function = transformation_function_credal;
-    return semiring;
-}
+//     semiring->transformation_function = transformation_function_credal;
+//     return semiring;
+// }

@@ -9,9 +9,17 @@ void print_var_mapping(var_mapping *var_map) {
     }
 }
 
-
-cnf parse_cnf(char *filename, var_mapping *var_map) {
+void parse_cnf(char *filename, cnf *theory, var_mapping *var_map) {
     FILE *fp;
+    char line[256];
+    char *tokenized = NULL;
+    // cnf *theory = malloc(sizeof(cnf)); // Allocate memory for cnf struct
+    unsigned int num_clauses, num_vars;
+    unsigned int nt = 0;
+    unsigned int idx_clause = 0;
+
+    theory->n_variables = 0;
+
     // char *line = NULL;
     // var *variables_mappings = malloc(100 * sizeof(var)); // Allocate memory for variable mappings
     // var_map = malloc(sizeof(var_mapping)); // Allocate memory for variable mapping struct
@@ -22,11 +30,8 @@ cnf parse_cnf(char *filename, var_mapping *var_map) {
         exit(1);
     }
     // Read the file and process it
-    char line[256];
-    char *tokenized = NULL;
-    cnf theory;
-    theory.n_clauses = 0;
-    theory.clauses = NULL;
+    theory->n_clauses = 0;
+    // theory.clauses = NULL;
     while (fgets(line, sizeof(line), fp) != NULL) {
         // Process the line
         // each line has the format of a cnf line, where lines start with 'p cnf' and end with '0'
@@ -39,11 +44,14 @@ cnf parse_cnf(char *filename, var_mapping *var_map) {
             tokenized = strtok(line, " ");
             tokenized = strtok(NULL, " ");
             tokenized = strtok(NULL, " ");
-            int num_vars = atoi(tokenized);
+            num_vars = atoi(tokenized);
             tokenized = strtok(NULL, " ");
-            int num_clauses = atoi(tokenized);
+            num_clauses = atoi(tokenized);
             printf("Number of variables: %d\n", num_vars);
             printf("Number of clauses: %d\n", num_clauses);
+            theory->n_variables = num_vars;
+            theory->n_clauses = num_clauses;
+            // theory->clauses = malloc(num_clauses * sizeof(clause*)); // Allocate memory for clauses
         }
         else if (line[0] == 'c') {
             // This is the comment line
@@ -65,23 +73,26 @@ cnf parse_cnf(char *filename, var_mapping *var_map) {
         }
         else {
             // This is a clause line
-            theory.n_clauses++;
-            theory.clauses = realloc(theory.clauses, theory.n_clauses * sizeof(clause));
-            clause *new_clause = &theory.clauses[theory.n_clauses - 1];
+            // theory.clauses = realloc(theory.clauses, theory.n_clauses * sizeof(clause));
+            // clause *new_clause = &theory->clauses[theory->n_clauses - 1];
+            theory->clauses[idx_clause].n_terms = 0;
+            // theory->clauses[theory->n_clauses].terms = malloc(100 * sizeof(int)); // Allocate memory for terms
             
-            new_clause->terms = malloc(100 * sizeof(int)); // Allocate memory for terms
-            new_clause->n_terms = 0;
-
             char *token = strtok(line, " ");
             while (token != NULL) {
                 int var = atoi(token);
                 if (var == 0) {
                     break; // End of clause
                 }
-                new_clause->terms[new_clause->n_terms++] = var;
+                nt = theory->clauses[idx_clause].n_terms;
+                theory->clauses[idx_clause].terms[nt] = var;
+                theory->clauses[idx_clause].n_terms++;
+                // new_clause->terms[new_clause->n_terms++] = var;
                 token = strtok(NULL, " ");
             }
-            new_clause->terms = realloc(new_clause->terms, new_clause->n_terms * sizeof(int)); // Resize to actual number of terms
+            // new_clause->terms = realloc(new_clause->terms, new_clause->n_terms * sizeof(int)); // Resize to actual number of terms
+            // theory->n_clauses++;
+            idx_clause++;
         }
     }
     // Close the file
@@ -96,5 +107,5 @@ cnf parse_cnf(char *filename, var_mapping *var_map) {
     //     free(theory.clauses[i].terms);
     // }
     // free(theory.clauses);
-    return theory;
+    // return theory;
 }

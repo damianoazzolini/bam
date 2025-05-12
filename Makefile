@@ -15,7 +15,7 @@ bam: bam.o cnf_handler.o semiring.o
 
 bam.o : src/bam.c
 	cd cudd &&  $(MAKE) && cd ..
-	gcc -c $(CFLAGSprog) $(DEBUGFLAGS) src/bam.c -o bam.o
+	gcc -c $(CFLAGSprog) $(DEBUGFLAGS) -DDEBUG_MODE src/bam.c -o bam.o
 
 cnf_handler.o: src/cnf_handler.c src/cnf_handler.h
 	gcc -c $(CFLAGSprog) $(DEBUGFLAGS) src/cnf_handler.c -o cnf_handler.o
