@@ -25,29 +25,23 @@
 
 void traverse_bdd_amc_aux(DdManager* dd, DdNode* node, int * list, const var_mapping *var_map, const semiring_t *semiring, double *query_amc) {
     // similar to ddPrintMintermAux
-    DdNode *N,*Nv,*Nnv;
+    DdNode *current_node, *then_branch, *else_branch;
     int i,v;
     unsigned int index;
 
-    N = Cudd_Regular(node);
+    current_node = Cudd_Regular(node);
 
-    if (Cudd_IsConstant(N)) {
+    if (Cudd_IsConstant(current_node)) {
         // Terminal case: Print one cube based on the current recursion path
         if (node !=  Cudd_ReadBackground(dd) && node != Cudd_Not(Cudd_ReadOne(dd))) {
             double current_amc = semiring->neutral_mul;
             for (i = 0; i <  Cudd_ReadSize(dd); i++) {
                 double current_weight = 1.0;
-                int found = 0;
+                int found = var_map->used[i]; // this should be fixed when AMC is used
+
                 v = list[i];
-                // i is the i-th variable
-                for(int j = 0; j < var_map->n_variables_mappings; j++) {
-                    if (var_map->variables_mappings[j].idx_var == i) {
-                        current_weight = var_map->variables_mappings[j].prob;
-                        found = 1; // only weighted variables
-                        break;
-                    }
-                }
-                // printf("found %lf\n", current_prob);
+                current_weight = var_map->variables_mappings[i].prob;
+
                 switch (v) {
                 case VAR_FALSE:
                     #ifdef DEBUG_MODE
@@ -56,7 +50,6 @@ void traverse_bdd_amc_aux(DdManager* dd, DdNode* node, int * list, const var_map
                     if(found == 1) {
                         // quando si considera algebraic, non va più bene found ma serve il peso
                         current_amc = semiring->mul(current_amc, (1 - current_weight));
-                        // prob *= (1 - current_prob);
                     }
                     break;
                 case VAR_TRUE:
@@ -65,7 +58,6 @@ void traverse_bdd_amc_aux(DdManager* dd, DdNode* node, int * list, const var_map
                     #endif
                     if(found == 1) {
                         current_amc = semiring->mul(current_amc, current_weight);
-                        // prob *= current_prob;
                     }
                     break;
                 case VAR_DONT_CARE:
@@ -87,21 +79,20 @@ void traverse_bdd_amc_aux(DdManager* dd, DdNode* node, int * list, const var_map
         }
     } 
     else {
-        Nv = Cudd_T(N);
-        Nnv = Cudd_E(N);
+        then_branch = Cudd_T(current_node);
+        else_branch = Cudd_E(current_node);
         if (Cudd_IsComplement(node)) {
-            Nv = Cudd_Not(Nv);
-            Nnv = Cudd_Not(Nnv);
+            then_branch = Cudd_Not(then_branch);
+            else_branch = Cudd_Not(else_branch);
         }
-        index = Cudd_NodeReadIndex(N);
+        index = Cudd_NodeReadIndex(current_node);
         list[index] = VAR_FALSE;
-        traverse_bdd_amc_aux(dd,Nnv,list, var_map, semiring, query_amc);
+        traverse_bdd_amc_aux(dd, else_branch, list, var_map, semiring, query_amc);
         list[index] = VAR_TRUE;
-        traverse_bdd_amc_aux(dd,Nv,list, var_map, semiring, query_amc);
+        traverse_bdd_amc_aux(dd, then_branch, list, var_map, semiring, query_amc);
         list[index] = VAR_DONT_CARE;
     }
-    // return 
-} /* end of ddPrintMintermAux */
+}
 
 
 double traverse_bdd_amc(DdManager *manager, DdNode *node, const var_mapping *var_map, const semiring_t *semiring) {
@@ -127,18 +118,23 @@ double traverse_bdd_amc(DdManager *manager, DdNode *node, const var_mapping *var
 // }
 
 
-int main (int argc, char *argv[]) {
+int main(int argc, char *argv[]) {
     DdManager *manager;
     DdNode *var_node, *tmp;
     DdNode *f;
     DdNode *for_clause;
     cnf theory;
     var_mapping var_map;
-    int i, j, var;
+    unsigned int i, j;
+    int var;
     double res = 0.0;
     semiring_t semiring = max_times_semiring();
     
     var_map.n_variables_mappings = 0;
+    // set all the variables to unused
+    for (i = 0; i < 100; i++) {
+        var_map.used[i] = 0;
+    }
 
     #ifdef DEBUG_MODE
     printf("DEBUG_MODE is ON\n");
@@ -155,7 +151,10 @@ int main (int argc, char *argv[]) {
     
     parse_cnf(argv[1], &theory, &var_map);
 
+    
     print_var_mapping(&var_map);
+
+    // return 0;
 
     manager = Cudd_Init(theory.n_variables,0,CUDD_UNIQUE_SLOTS,CUDD_CACHE_SLOTS,0); /* Initialize a new BDD manager. */
     f = Cudd_ReadOne(manager);
@@ -167,7 +166,6 @@ int main (int argc, char *argv[]) {
     for(i = 0; i < theory.n_clauses; i++) {
         for_clause = Cudd_ReadLogicZero(manager);
         Cudd_Ref(for_clause); /* Increases the reference count of a node */
-        printf("%d\n", theory.clauses[i].n_terms);
         for (j = 0; j < theory.clauses[i].n_terms; j++) {
 
             var = abs(theory.clauses[i].terms[j]);

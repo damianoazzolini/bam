@@ -1,12 +1,12 @@
 
 typedef struct clause{
     int terms[64];
-    int n_terms;
+    unsigned int n_terms;
 } clause;
 
 typedef struct var {
     char name[20];
-    int idx_var;
+    // int idx_var;
     double prob;
 } var;
 
@@ -18,6 +18,7 @@ typedef struct cnf{
 
 typedef struct var_mapping {
     var variables_mappings[100];
+    int used[100]; // mark a variable at position i as used
     int n_variables_mappings;
 } var_mapping;
 

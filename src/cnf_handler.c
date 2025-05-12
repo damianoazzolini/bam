@@ -4,8 +4,14 @@
 #include <string.h>
 
 void print_var_mapping(var_mapping *var_map) {
-    for (int i = 0; i < var_map->n_variables_mappings; i++) {
-        printf("Variable %d: %s, %d, %lf\n", var_map->variables_mappings[i].idx_var, var_map->variables_mappings[i].name, var_map->variables_mappings[i].idx_var, var_map->variables_mappings[i].prob);
+    int total = var_map->n_variables_mappings;
+    int i = 0;
+    while(total > 0) {
+        if (var_map->used[i] > 0) {
+            printf("Variable %d: %s, %lf\n", i, var_map->variables_mappings[i].name, var_map->variables_mappings[i].prob);
+            total--;
+        }
+        i++;
     }
 }
 
@@ -44,9 +50,9 @@ void parse_cnf(char *filename, cnf *theory, var_mapping *var_map) {
             tokenized = strtok(line, " ");
             tokenized = strtok(NULL, " ");
             tokenized = strtok(NULL, " ");
-            num_vars = atoi(tokenized);
+            num_vars = (unsigned int) strtoul(tokenized, NULL, 10);
             tokenized = strtok(NULL, " ");
-            num_clauses = atoi(tokenized);
+            num_clauses = (unsigned int) strtoul(tokenized, NULL, 10);
             printf("Number of variables: %d\n", num_vars);
             printf("Number of clauses: %d\n", num_clauses);
             theory->n_variables = num_vars;
@@ -58,17 +64,23 @@ void parse_cnf(char *filename, cnf *theory, var_mapping *var_map) {
             tokenized = strtok(line, " ");
             tokenized = strtok(NULL, " ");
             int idx_var = atoi(tokenized);
-            var_map->variables_mappings[var_map->n_variables_mappings].idx_var = idx_var;
+            printf("Variable %d\n", idx_var);
+            // var_map->variables_mappings[var_map->n_variables_mappings].idx_var = idx_var;
+            // var_map->variables_mappings[idx_var].idx_var = idx_var;
+            var_map->used[idx_var] = 1; // Mark the variable as used
             
             tokenized = strtok(NULL, " ");
-            strcpy(var_map->variables_mappings[var_map->n_variables_mappings].name, tokenized);
-            var_map->variables_mappings[var_map->n_variables_mappings].name[strcspn(var_map->variables_mappings[var_map->n_variables_mappings].name, "\n")] = 0; // Remove newline character
+            // strcpy(var_map->variables_mappings[var_map->n_variables_mappings].name, tokenized);
+            strcpy(var_map->variables_mappings[idx_var].name, tokenized);
+            // var_map->variables_mappings[var_map->n_variables_mappings].name[strcspn(var_map->variables_mappings[var_map->n_variables_mappings].name, "\n")] = 0; // Remove newline character
+            var_map->variables_mappings[idx_var].name[strcspn(var_map->variables_mappings[idx_var].name, "\n")] = 0; // Remove newline character
             
             tokenized = strtok(NULL, " ");
             double prob_var = atof(tokenized);
             printf("%lf\n", prob_var);
             
-            var_map->variables_mappings[var_map->n_variables_mappings].prob = prob_var; // Default probability
+            // var_map->variables_mappings[var_map->n_variables_mappings].prob = prob_var; // Default probability
+            var_map->variables_mappings[idx_var].prob = prob_var; // Default probability
             var_map->n_variables_mappings++;
         }
         else {
