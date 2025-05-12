@@ -1,0 +1,1 @@
+gringo prova.lp --output=smodels | ./lp2normal-2.18 | ./lpshift-1.2 | ./lp2atomic-1.17 | ./lp2sat-1.24 > CNF

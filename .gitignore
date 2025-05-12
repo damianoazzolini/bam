@@ -1,0 +1,12 @@
+.vscode
+*.o
+a.txt
+lp2atomic-1.17
+lp2normal-2.18
+lp2sat-1.24
+lpshift-1.2
+prova.lp
+prova_2.lp
+bam
+CNF
+CNF2
