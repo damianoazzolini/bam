@@ -28,6 +28,7 @@ void traverse_bdd_amc_aux(DdManager* dd, DdNode* node, int * list, const var_map
     DdNode *current_node, *then_branch, *else_branch;
     int i,v;
     unsigned int index;
+    double current_weight_true, current_weight_false;
 
     current_node = Cudd_Regular(node);
 
@@ -36,11 +37,12 @@ void traverse_bdd_amc_aux(DdManager* dd, DdNode* node, int * list, const var_map
         if (node !=  Cudd_ReadBackground(dd) && node != Cudd_Not(Cudd_ReadOne(dd))) {
             double current_amc = semiring->neutral_mul;
             for (i = 0; i <  Cudd_ReadSize(dd); i++) {
-                double current_weight = 1.0;
+                // double current_weight = 1.0;
                 int found = var_map->used[i]; // this should be fixed when AMC is used
 
                 v = list[i];
-                current_weight = var_map->variables_mappings[i].prob;
+                current_weight_true = var_map->variables_mappings[i].weight_true;
+                current_weight_false = var_map->variables_mappings[i].weight_false;
 
                 switch (v) {
                 case VAR_FALSE:
@@ -48,8 +50,7 @@ void traverse_bdd_amc_aux(DdManager* dd, DdNode* node, int * list, const var_map
                     printf("0");
                     #endif
                     if(found == 1) {
-                        // quando si considera algebraic, non va più bene found ma serve il peso
-                        current_amc = semiring->mul(current_amc, (1 - current_weight));
+                        current_amc = semiring->mul(current_amc, current_weight_false);
                     }
                     break;
                 case VAR_TRUE:
@@ -57,7 +58,7 @@ void traverse_bdd_amc_aux(DdManager* dd, DdNode* node, int * list, const var_map
                     printf("1");
                     #endif
                     if(found == 1) {
-                        current_amc = semiring->mul(current_amc, current_weight);
+                        current_amc = semiring->mul(current_amc, current_weight_true);
                     }
                     break;
                 case VAR_DONT_CARE:
@@ -132,7 +133,7 @@ int main(int argc, char *argv[]) {
     
     var_map.n_variables_mappings = 0;
     // set all the variables to unused
-    for (i = 0; i < 100; i++) {
+    for (i = 0; i < 256; i++) {
         var_map.used[i] = 0;
     }
 

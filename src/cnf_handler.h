@@ -7,7 +7,8 @@ typedef struct clause{
 typedef struct var {
     char name[20];
     // int idx_var;
-    double prob;
+    double weight_true;
+    double weight_false;
 } var;
 
 typedef struct cnf{
@@ -17,8 +18,8 @@ typedef struct cnf{
 } cnf;
 
 typedef struct var_mapping {
-    var variables_mappings[100];
-    int used[100]; // mark a variable at position i as used
+    var variables_mappings[256];
+    int used[256]; // mark a variable at position i as used
     int n_variables_mappings;
 } var_mapping;
 

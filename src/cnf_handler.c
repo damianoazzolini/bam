@@ -8,7 +8,7 @@ void print_var_mapping(var_mapping *var_map) {
     int i = 0;
     while(total > 0) {
         if (var_map->used[i] > 0) {
-            printf("Variable %d: %s, %lf\n", i, var_map->variables_mappings[i].name, var_map->variables_mappings[i].prob);
+            printf("Variable %d: %s, %lf, %lf\n", i, var_map->variables_mappings[i].name, var_map->variables_mappings[i].weight_true, var_map->variables_mappings[i].weight_false);
             total--;
         }
         i++;
@@ -61,6 +61,8 @@ void parse_cnf(char *filename, cnf *theory, var_mapping *var_map) {
         }
         else if (line[0] == 'c') {
             // This is the comment line
+            // c id name weight_true weight_false
+            // c 2 a 0.2 0.8
             tokenized = strtok(line, " ");
             tokenized = strtok(NULL, " ");
             int idx_var = atoi(tokenized);
@@ -76,11 +78,15 @@ void parse_cnf(char *filename, cnf *theory, var_mapping *var_map) {
             var_map->variables_mappings[idx_var].name[strcspn(var_map->variables_mappings[idx_var].name, "\n")] = 0; // Remove newline character
             
             tokenized = strtok(NULL, " ");
-            double prob_var = atof(tokenized);
-            printf("%lf\n", prob_var);
-            
+            double weight = atof(tokenized);
+            printf("T: %lf\n", weight);
             // var_map->variables_mappings[var_map->n_variables_mappings].prob = prob_var; // Default probability
-            var_map->variables_mappings[idx_var].prob = prob_var; // Default probability
+            var_map->variables_mappings[idx_var].weight_true = weight;
+            tokenized = strtok(NULL, " ");
+            weight = atof(tokenized);
+            printf("F: %lf\n", weight);
+            var_map->variables_mappings[idx_var].weight_false = weight;
+
             var_map->n_variables_mappings++;
         }
         else {

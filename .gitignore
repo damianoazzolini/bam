@@ -10,4 +10,8 @@ prova_2.lp
 bam
 CNF
 CNF2
+CNF3
+CNF4
 valgrind-out.txt
+ADDMC
+cudd/

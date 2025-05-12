@@ -13,7 +13,7 @@ all: bam
 bam: bam.o cnf_handler.o semiring.o
 	gcc bam.o cnf_handler.o semiring.o $(LDFLAGS) -o bam -lm
 
-bam.o : src/bam.c
+bam.o : src/bam.c src/cnf_handler.h src/semiring.h
 	cd cudd &&  $(MAKE) && cd ..
 	gcc -c $(CFLAGSprog) $(DEBUGFLAGS) -DDEBUG_MODE src/bam.c -o bam.o
 
