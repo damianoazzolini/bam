@@ -53,41 +53,63 @@ void parse_cnf(char *filename, cnf *theory, var_mapping *var_map) {
             num_vars = (unsigned int) strtoul(tokenized, NULL, 10);
             tokenized = strtok(NULL, " ");
             num_clauses = (unsigned int) strtoul(tokenized, NULL, 10);
-            printf("Number of variables: %d\n", num_vars);
-            printf("Number of clauses: %d\n", num_clauses);
             theory->n_variables = num_vars;
             theory->n_clauses = num_clauses;
+            printf("Number of variables: %d\n", theory->n_variables);
+            printf("Number of clauses: %d\n", theory->n_clauses);
             // theory->clauses = malloc(num_clauses * sizeof(clause*)); // Allocate memory for clauses
         }
-        else if (line[0] == 'c') {
+        // else if (line[0] == 'c') {
+        else if (line[0] == 'w') {
             // This is the comment line
-            // c id name weight_true weight_false
-            // c 2 a 0.2 0.8
+            // c id weight
             tokenized = strtok(line, " ");
             tokenized = strtok(NULL, " ");
             int idx_var = atoi(tokenized);
-            printf("Variable %d\n", idx_var);
+            int index_var = abs(idx_var);
+            // int index_var = idx_var ? idx_var > 0 : theory->n_variables/2 + abs(idx_var);
+            // int index_var = 0;
+            // if(idx_var < 0) {
+                // index_var = abs(idx_var) + theory->n_variables/2;
+            // }
+            // else {
+                // index_var = idx_var;
+            // }
+
+            // printf("Variable %d %d\n", idx_var, index_var);
             // var_map->variables_mappings[var_map->n_variables_mappings].idx_var = idx_var;
             // var_map->variables_mappings[idx_var].idx_var = idx_var;
-            var_map->used[idx_var] = 1; // Mark the variable as used
+            if(var_map->used[index_var] == 0) {
+                var_map->used[index_var] = 1; // Mark the variable as used
+                var_map->n_variables_mappings++;
+            }
             
-            tokenized = strtok(NULL, " ");
-            // strcpy(var_map->variables_mappings[var_map->n_variables_mappings].name, tokenized);
-            strcpy(var_map->variables_mappings[idx_var].name, tokenized);
-            // var_map->variables_mappings[var_map->n_variables_mappings].name[strcspn(var_map->variables_mappings[var_map->n_variables_mappings].name, "\n")] = 0; // Remove newline character
-            var_map->variables_mappings[idx_var].name[strcspn(var_map->variables_mappings[idx_var].name, "\n")] = 0; // Remove newline character
-            
-            tokenized = strtok(NULL, " ");
+            tokenized = strtok(NULL, " "); // weight
             double weight = atof(tokenized);
-            printf("T: %lf\n", weight);
-            // var_map->variables_mappings[var_map->n_variables_mappings].prob = prob_var; // Default probability
-            var_map->variables_mappings[idx_var].weight_true = weight;
-            tokenized = strtok(NULL, " ");
-            weight = atof(tokenized);
-            printf("F: %lf\n", weight);
-            var_map->variables_mappings[idx_var].weight_false = weight;
+            if (idx_var < 0) {
+                var_map->variables_mappings[index_var].weight_false = weight;
+            } else {
+                var_map->variables_mappings[index_var].weight_true = weight;
+            }
+            // // strcpy(var_map->variables_mappings[var_map->n_variables_mappings].name, tokenized);
+            // strcpy(var_map->variables_mappings[abs_idx_var].name, tokenized);
+            // // var_map->variables_mappings[var_map->n_variables_mappings].name[strcspn(var_map->variables_mappings[var_map->n_variables_mappings].name, "\n")] = 0; // Remove newline character
+            // var_map->variables_mappings[idx_var].name[strcspn(var_map->variables_mappings[idx_var].name, "\n")] = 0; // Remove newline character
+            
+            // tokenized = strtok(NULL, " ");
+            // double weight = atof(tokenized);
+            // printf("T: %lf\n", weight);
+            // // var_map->variables_mappings[var_map->n_variables_mappings].prob = prob_var; // Default probability
+            // var_map->variables_mappings[idx_var].weight_true = weight;
+            // tokenized = strtok(NULL, " ");
+            // weight = atof(tokenized);
+            // printf("F: %lf\n", weight);
+            // var_map->variables_mappings[idx_var].weight_false = weight;
 
-            var_map->n_variables_mappings++;
+            // var_map->n_variables_mappings++;
+        }
+        else if (line[0] == 'c') {
+            // ignore
         }
         else {
             // This is a clause line

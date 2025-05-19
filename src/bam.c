@@ -29,53 +29,91 @@ void traverse_bdd_amc_aux(DdManager* dd, DdNode* node, int * list, const var_map
     int i,v;
     unsigned int index;
     double current_weight_true, current_weight_false;
+    int two_positions[256]; // Store indices of elements equal to 2
+    int two_count = 0;
 
     current_node = Cudd_Regular(node);
 
     if (Cudd_IsConstant(current_node)) {
         // Terminal case: Print one cube based on the current recursion path
         if (node !=  Cudd_ReadBackground(dd) && node != Cudd_Not(Cudd_ReadOne(dd))) {
-            double current_amc = semiring->neutral_mul;
-            for (i = 0; i <  Cudd_ReadSize(dd); i++) {
-                // double current_weight = 1.0;
-                int found = var_map->used[i]; // this should be fixed when AMC is used
-
+            // compute the position of the 2s
+            // printf("size: %d\n", Cudd_ReadSize(dd));
+            for (int i = 1; i < Cudd_ReadSize(dd); i++) { // <---- here we start from 1, maybe var 0 has a special meaning
                 v = list[i];
-                current_weight_true = var_map->variables_mappings[i].weight_true;
-                current_weight_false = var_map->variables_mappings[i].weight_false;
-
-                switch (v) {
-                case VAR_FALSE:
-                    #ifdef DEBUG_MODE
-                    printf("0");
-                    #endif
-                    if(found == 1) {
-                        current_amc = semiring->mul(current_amc, current_weight_false);
-                    }
-                    break;
-                case VAR_TRUE:
-                    #ifdef DEBUG_MODE
-                    printf("1");
-                    #endif
-                    if(found == 1) {
-                        current_amc = semiring->mul(current_amc, current_weight_true);
-                    }
-                    break;
-                case VAR_DONT_CARE:
-                    #ifdef DEBUG_MODE
-                    printf("-");
-                    #endif
-                    break;
-                default:
-                    break;
+                if (v == VAR_DONT_CARE) {
+                    two_positions[two_count++] = i;
                 }
             }
-            #ifdef DEBUG_MODE
-            printf(" % g %lf\n", Cudd_V(node), current_amc);
-            #endif
-            if(Cudd_V(node) == 1) {
-                *query_amc = semiring->add(*query_amc, current_amc);
-                // *query_prob = *query_prob + prob;
+
+            // compute the number of combinations
+            int combinations = 1 << two_count;  // 2^two_count
+            // printf("combinations: %d\n", combinations);
+            // Iterate over all combinations
+            for (int i = 0; i < combinations; i++) {
+                int temp[256];
+                // Copy original array
+                for (int j = 0; j < Cudd_ReadSize(dd); j++) {
+                    temp[j] = list[j];
+                }
+
+                // Apply combination by replacing 2s
+                for (int j = 0; j < two_count; j++) {
+                    int bit = (i >> j) & 1;
+                    temp[two_positions[j]] = bit;
+                }
+
+                // Print result -> perform the semiring operation
+                // #ifdef DEBUG_MODE
+                // printf("{");
+                // for (int j = 0; j < Cudd_ReadSize(dd); j++) {
+                //     printf("%d", temp[j]);
+                //     if (j < Cudd_ReadSize(dd) - 1) printf(", ");
+                // }
+                // printf("}\n");
+                // #endif
+                double current_amc = semiring->neutral_mul;
+                for (int i = 0; i <  Cudd_ReadSize(dd); i++) {
+                    // double current_weight = 1.0;
+                    // int found = var_map->used[i]; // this should be fixed when AMC is used
+    
+                    v = temp[i];
+                    current_weight_true = var_map->variables_mappings[i].weight_true;
+                    current_weight_false = var_map->variables_mappings[i].weight_false;
+    
+                    switch (v) {
+                    case VAR_FALSE:
+                        #ifdef DEBUG_MODE
+                        printf("0");
+                        #endif
+                        // if(found == 1) {
+                            current_amc = semiring->mul(current_amc, current_weight_false);
+                        // }
+                        break;
+                    case VAR_TRUE:
+                        #ifdef DEBUG_MODE
+                        printf("1");
+                        #endif
+                        // if(found == 1) {
+                            current_amc = semiring->mul(current_amc, current_weight_true);
+                        // }
+                        break;
+                    // case VAR_DONT_CARE:
+                    //     #ifdef DEBUG_MODE
+                    //     printf("-");
+                    //     #endif
+                    //     // TODO: here, mul p and 1-p? then add? <--- crucial otherwise not correct
+                    //     break;
+                    // default:
+                    //     break;
+                    }
+                }
+                #ifdef DEBUG_MODE
+                printf(" -> %lf\n", current_amc);
+                #endif
+                if(Cudd_V(node) == 1) {
+                    *query_amc = semiring->add(*query_amc, current_amc);
+                }
             }
         }
     } 
@@ -127,9 +165,9 @@ int main(int argc, char *argv[]) {
     cnf theory;
     var_mapping var_map;
     unsigned int i, j;
-    int var;
+    int var, pos;
     double res = 0.0;
-    semiring_t semiring = max_times_semiring();
+    semiring_t semiring = prob_semiring(); // max_times_semiring();
     
     var_map.n_variables_mappings = 0;
     // set all the variables to unused
@@ -141,14 +179,14 @@ int main(int argc, char *argv[]) {
     printf("DEBUG_MODE is ON\n");
     #endif
 
-    if (argc < 4) {
-        fprintf(stderr, "Usage: %s <cnf_file> --task TASK\n", argv[0]);
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s <cnf_file>\n", argv[0]);
         return -1;
     }
-    if (strcmp(argv[2], "--task") != 0) {
-        fprintf(stderr, "Usage: %s <cnf_file> --task TASK\n", argv[0]);
-        return -1;
-    }
+    // if (strcmp(argv[2], "--task") != 0) {
+    //     fprintf(stderr, "Usage: %s <cnf_file> --task TASK\n", argv[0]);
+    //     return -1;
+    // }
     
     parse_cnf(argv[1], &theory, &var_map);
 
@@ -169,7 +207,9 @@ int main(int argc, char *argv[]) {
         Cudd_Ref(for_clause); /* Increases the reference count of a node */
         for (j = 0; j < theory.clauses[i].n_terms; j++) {
 
+            // var = abs(theory.clauses[i].terms[j]);
             var = abs(theory.clauses[i].terms[j]);
+            // printf("pos: %d\n", var);
             var_node = Cudd_bddIthVar(manager, var);
             // Cudd_Ref(vars_list[var-1]); /* Increases the reference count of a node */
             if (theory.clauses[i].terms[j] > 0) {
@@ -197,20 +237,31 @@ int main(int argc, char *argv[]) {
     #ifdef DEBUG_MODE
     Cudd_PrintDebug(manager, f, 3, 2); /* Print the BDD */
     Cudd_PrintMinterm(manager, f); /* Print the minterms of the BDD */
-    printf("traversal\n");
+    // printf("traversal\n");
     #endif
 
+    // printf("conversion to ZDD\n");
+    // DdNode *zdd = Cudd_zddPortFromBdd(manager, f); 
+    // if (zdd == NULL) {
+    //     fprintf(stderr, "Error: Cudd_zddPortFromBdd failed\n");
+    //     return -1;
+    // }
+    // Cudd_zddPrintMinterm(manager, zdd); /* Print the minterms of the BDD */
+    // Cudd_zddPrintCover(manager, zdd); /* Print the minterms of the BDD */
+    // Cudd_zddPrintMinterm(manager, zdd); /* Print the minterms of the BDD */
 
-    if(strcmp(argv[3], "amc") == 0) {
-        res = traverse_bdd_amc(manager, f, &var_map, &semiring); /* Traverse the BDD and print the minterms */
-    }
-    else if(strcmp(argv[3], "amc2") == 0) {
-        // res = traverse_bdd_2amc(manager, f, &var_map, &semiring); /* Traverse the BDD and print the minterms */
-    }
-    else {
-        fprintf(stderr, "Usage: %s <cnf_file> --task TASK\n", argv[0]);
-        return -1;
-    }
+    // return 0;
+
+    // if(strcmp(argv[3], "amc") == 0) {
+    res = traverse_bdd_amc(manager, f, &var_map, &semiring); /* Traverse the BDD and print the minterms */
+    // }
+    // else if(strcmp(argv[3], "amc2") == 0) {
+    //     // res = traverse_bdd_2amc(manager, f, &var_map, &semiring); /* Traverse the BDD and print the minterms */
+    // }
+    // else {
+    //     fprintf(stderr, "Usage: %s <cnf_file> --task TASK\n", argv[0]);
+    //     return -1;
+    // }
     // double prob = compute_prob(f, &var_map);
     printf("Weight: %lf\n", res);
 
