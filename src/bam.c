@@ -238,18 +238,38 @@ int main(int argc, char *argv[]) {
     var_mapping *var_map = init_var_mapping();
     semiring_t semiring = prob_semiring(); // max_times_semiring();
 
-    #ifdef DEBUG_MODE
-    printf("DEBUG_MODE is ON\n");
-    #endif
-
+    printf("argc: %d\n", argc);
     if (argc < 2) {
         fprintf(stderr, "Usage: %s <cnf_file>\n", argv[0]);
         return -1;
     }
-    // if (strcmp(argv[2], "--task") != 0) {
-    //     fprintf(stderr, "Usage: %s <cnf_file> --task TASK\n", argv[0]);
-    //     return -1;
-    // }
+    if (argc >= 4) {
+        if(strcmp(argv[2], "-s") != 0 && strcmp(argv[2], "--semiring") != 0) {
+            fprintf(stderr, "Usage: %s <cnf_file> -s SEMIRING\n", argv[0]);
+            return -1;
+        }
+        if (strcmp(argv[3], "max_times") == 0) {
+            semiring = max_times_semiring();
+        }
+        else if (strcmp(argv[3], "min_times") == 0) {
+            semiring = min_times_semiring();
+        }
+        else if (strcmp(argv[3], "prob") == 0) {
+            semiring = prob_semiring();
+        }
+        else {
+            fprintf(stderr, "Semiring not implemented: %s\n", argv[3]);
+            return -1;
+        }
+        printf("Semiring: %s\n", argv[3]);
+    }
+    else {
+        printf("Default semiring: prob/WMC\n");
+    }
+    
+    #ifdef DEBUG_MODE
+    printf("DEBUG_MODE is ON\n");
+    #endif
     
     parse_cnf(argv[1], theory, var_map);
 

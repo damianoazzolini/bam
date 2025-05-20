@@ -33,8 +33,14 @@ typedef struct second_level_amc_t {
 } second_level_amc_t;
 
 // single variable
-semiring_t prob_semiring();
-semiring_t max_times_semiring();
+semiring_t bool_semiring();
+semiring_t sat_semiring();
+semiring_t wmc_semiring(); // same as prob
+semiring_t sharp_sat_semiring();
+semiring_t prob_semiring(); 
+semiring_t sens_semiring();
+semiring_t grad_semiring();
+semiring_t max_times_semiring(); // MPE
 semiring_t min_times_semiring();
 semiring_t max_plus_semiring();
 

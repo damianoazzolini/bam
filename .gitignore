@@ -15,3 +15,5 @@ minic2d/
 cudd/
 prova.c
 a.py
+a.out
+generate_cnf.py
