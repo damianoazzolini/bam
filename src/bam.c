@@ -13,20 +13,10 @@
 #define VAR_TRUE 1
 #define VAR_DONT_CARE 2
 
-// c 2 b 0.2
-// c 3 q 1
-// c 4 a 0.3
-// -1 b q c ..
-// -0 0 1 1 10010001  1
-// -0 1 1 0 01000110  1
-// -0 1 1 1 00000011
-// minterms counts from index 1
-// apply the semiring to the minterms
-
 void traverse_bdd_amc_aux(DdManager* dd, DdNode* node, int * list, const var_mapping *var_map, const semiring_t *semiring, double *query_amc) {
     // similar to ddPrintMintermAux
     DdNode *current_node, *then_branch, *else_branch;
-    int i,v;
+    int v, j, current_combination;
     unsigned int index;
     double current_weight_true, current_weight_false;
     int two_positions[256]; // Store indices of elements equal to 2
@@ -37,76 +27,59 @@ void traverse_bdd_amc_aux(DdManager* dd, DdNode* node, int * list, const var_map
     if (Cudd_IsConstant(current_node)) {
         // Terminal case: Print one cube based on the current recursion path
         if (node !=  Cudd_ReadBackground(dd) && node != Cudd_Not(Cudd_ReadOne(dd))) {
+            int temp[256];
+            int combinations = 0;
+            int bit;
+
             // compute the position of the 2s
-            // printf("size: %d\n", Cudd_ReadSize(dd));
-            for (int i = 1; i < Cudd_ReadSize(dd); i++) { // <---- here we start from 1, maybe var 0 has a special meaning
-                v = list[i];
+            for (j = 1; j < Cudd_ReadSize(dd); j++) { // we start from 1, 0 is the index of the ReadLogicZero
+                v = list[j];
                 if (v == VAR_DONT_CARE) {
-                    two_positions[two_count++] = i;
+                    two_positions[two_count++] = j;
                 }
             }
 
             // compute the number of combinations
-            int combinations = 1 << two_count;  // 2^two_count
-            // printf("combinations: %d\n", combinations);
-            // Iterate over all combinations
-            for (int i = 0; i < combinations; i++) {
-                int temp[256];
+            combinations = 1 << two_count;  // 2^two_count
+
+            // iterate over all combinations
+            for (current_combination = 0; current_combination < combinations; current_combination++) {
+                double current_amc = semiring->neutral_mul;
+
                 // Copy original array
-                for (int j = 0; j < Cudd_ReadSize(dd); j++) {
+                for (j = 0; j < Cudd_ReadSize(dd); j++) {
                     temp[j] = list[j];
                 }
 
                 // Apply combination by replacing 2s
-                for (int j = 0; j < two_count; j++) {
-                    int bit = (i >> j) & 1;
+                for (j = 0; j < two_count; j++) {
+                    bit = (current_combination >> j) & 1;
                     temp[two_positions[j]] = bit;
                 }
 
-                // Print result -> perform the semiring operation
-                // #ifdef DEBUG_MODE
-                // printf("{");
-                // for (int j = 0; j < Cudd_ReadSize(dd); j++) {
-                //     printf("%d", temp[j]);
-                //     if (j < Cudd_ReadSize(dd) - 1) printf(", ");
-                // }
-                // printf("}\n");
-                // #endif
-                double current_amc = semiring->neutral_mul;
-                for (int i = 0; i <  Cudd_ReadSize(dd); i++) {
-                    // double current_weight = 1.0;
-                    // int found = var_map->used[i]; // this should be fixed when AMC is used
-    
-                    v = temp[i];
-                    current_weight_true = var_map->variables_mappings[i].weight_true;
-                    current_weight_false = var_map->variables_mappings[i].weight_false;
-    
-                    switch (v) {
-                    case VAR_FALSE:
+                for (j = 1; j <  Cudd_ReadSize(dd); j++) { // from 1   
+                    v = temp[j];
+                    current_weight_true = var_map->variables_mappings[j].weight_true;
+                    current_weight_false = var_map->variables_mappings[j].weight_false;
+
+                    if(v == VAR_FALSE) {
                         #ifdef DEBUG_MODE
                         printf("0");
                         #endif
-                        // if(found == 1) {
-                            current_amc = semiring->mul(current_amc, current_weight_false);
-                        // }
-                        break;
-                    case VAR_TRUE:
+                        current_amc = semiring->mul(current_amc, current_weight_false);
+                    }
+                    else if(v == VAR_TRUE) {
                         #ifdef DEBUG_MODE
                         printf("1");
                         #endif
-                        // if(found == 1) {
-                            current_amc = semiring->mul(current_amc, current_weight_true);
-                        // }
-                        break;
-                    // case VAR_DONT_CARE:
-                    //     #ifdef DEBUG_MODE
-                    //     printf("-");
-                    //     #endif
-                    //     // TODO: here, mul p and 1-p? then add? <--- crucial otherwise not correct
-                    //     break;
-                    // default:
-                    //     break;
+                        current_amc = semiring->mul(current_amc, current_weight_true);
                     }
+                    #ifdef DEBUG_MODE
+                    else if(v == VAR_DONT_CARE) {
+                        printf("This should not happen");
+                        printf("-");
+                    }
+                    #endif
                 }
                 #ifdef DEBUG_MODE
                 printf(" -> %lf\n", current_amc);
@@ -152,10 +125,6 @@ double traverse_bdd_amc(DdManager *manager, DdNode *node, const var_mapping *var
     return query_amc;
 }
 
-// double traverse_bdd_2amc(DdManager *manager, DdNode *node, const var_mapping *var_map, const semiring_t *semiring) {
-//     return 0.0;
-// }
-
 
 int main(int argc, char *argv[]) {
     DdManager *manager;
@@ -165,7 +134,7 @@ int main(int argc, char *argv[]) {
     cnf theory;
     var_mapping var_map;
     unsigned int i, j;
-    int var, pos;
+    int var;
     double res = 0.0;
     semiring_t semiring = prob_semiring(); // max_times_semiring();
     
@@ -190,8 +159,9 @@ int main(int argc, char *argv[]) {
     
     parse_cnf(argv[1], &theory, &var_map);
 
-    
+    #ifdef DEBUG_MODE
     print_var_mapping(&var_map);
+    #endif
 
     // return 0;
 
