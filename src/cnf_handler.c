@@ -3,7 +3,39 @@
 #include <stdlib.h>
 #include <string.h>
 
-void print_var_mapping(var_mapping *var_map) {
+cnf *init_cnf() {
+    cnf *theory = malloc(sizeof(cnf));
+    theory->n_clauses = 0;
+    theory->n_variables = 0;
+    theory->clauses = NULL;
+    return theory;
+}
+
+void free_cnf(cnf *theory) {
+    if (theory != NULL) {
+        for (unsigned int i = 0; i < theory->n_clauses; i++) {
+            free(theory->clauses[i].terms);
+        }
+        free(theory->clauses);
+        free(theory);
+    }
+}
+
+var_mapping *init_var_mapping() {
+    var_mapping *var_map = malloc(sizeof(var_mapping)); // Allocate memory for variable mapping struct
+    var_map->n_variables_mappings = 0;
+    var_map->variables_mappings = NULL;
+    return var_map;
+}
+
+void free_var_mapping(var_mapping *var_map) {
+    if (var_map != NULL) {
+        free(var_map->variables_mappings); // Free the array of variables
+        free(var_map); // Free the var_mapping struct itself
+    }
+}
+
+void print_var_mapping(const var_mapping *var_map) {
     int total = var_map->n_variables_mappings;
     int i = 0;
     while(total > 0) {
@@ -57,6 +89,8 @@ void parse_cnf(char *filename, cnf *theory, var_mapping *var_map) {
             theory->n_clauses = num_clauses;
             printf("Number of variables: %d\n", theory->n_variables);
             printf("Number of clauses: %d\n", theory->n_clauses);
+            theory->clauses = malloc(num_clauses * sizeof(clause)); // Allocate memory for clauses
+            var_map->variables_mappings = malloc((num_vars + 1) * sizeof(var)); // Allocate memory for variable mappings
             // theory->clauses = malloc(num_clauses * sizeof(clause*)); // Allocate memory for clauses
         }
         // else if (line[0] == 'c') {
@@ -116,6 +150,7 @@ void parse_cnf(char *filename, cnf *theory, var_mapping *var_map) {
             // theory.clauses = realloc(theory.clauses, theory.n_clauses * sizeof(clause));
             // clause *new_clause = &theory->clauses[theory->n_clauses - 1];
             theory->clauses[idx_clause].n_terms = 0;
+            theory->clauses[idx_clause].terms = NULL;
             // theory->clauses[theory->n_clauses].terms = malloc(100 * sizeof(int)); // Allocate memory for terms
             
             char *token = strtok(line, " ");
@@ -125,6 +160,7 @@ void parse_cnf(char *filename, cnf *theory, var_mapping *var_map) {
                     break; // End of clause
                 }
                 nt = theory->clauses[idx_clause].n_terms;
+                theory->clauses[idx_clause].terms = realloc(theory->clauses[idx_clause].terms, (nt + 1) * sizeof(int)); // Resize to actual number of terms
                 theory->clauses[idx_clause].terms[nt] = var;
                 theory->clauses[idx_clause].n_terms++;
                 // new_clause->terms[new_clause->n_terms++] = var;
