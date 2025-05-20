@@ -125,47 +125,17 @@ double traverse_bdd_amc(DdManager *manager, DdNode *node, const var_mapping *var
     return query_amc;
 }
 
-
-int main(int argc, char *argv[]) {
+void solve_with_bdd(cnf theory, var_mapping var_map, semiring_t semiring) {
     DdManager *manager;
-    DdNode *var_node, *tmp;
     DdNode *f;
+    DdNode *var_node, *tmp;
     DdNode *for_clause;
-    cnf theory;
-    var_mapping var_map;
     unsigned int i, j;
     int var;
     double res = 0.0;
-    semiring_t semiring = prob_semiring(); // max_times_semiring();
     
-    var_map.n_variables_mappings = 0;
-    // set all the variables to unused
-    for (i = 0; i < 256; i++) {
-        var_map.used[i] = 0;
-    }
-
-    #ifdef DEBUG_MODE
-    printf("DEBUG_MODE is ON\n");
-    #endif
-
-    if (argc < 2) {
-        fprintf(stderr, "Usage: %s <cnf_file>\n", argv[0]);
-        return -1;
-    }
-    // if (strcmp(argv[2], "--task") != 0) {
-    //     fprintf(stderr, "Usage: %s <cnf_file> --task TASK\n", argv[0]);
-    //     return -1;
-    // }
-    
-    parse_cnf(argv[1], &theory, &var_map);
-
-    #ifdef DEBUG_MODE
-    print_var_mapping(&var_map);
-    #endif
-
-    // return 0;
-
     manager = Cudd_Init(theory.n_variables,0,CUDD_UNIQUE_SLOTS,CUDD_CACHE_SLOTS,0); /* Initialize a new BDD manager. */
+    // Cudd_AutodynDisable(manager);
     f = Cudd_ReadOne(manager);
     // documentation: https://add-lib.scce.info/assets/doxygen-cudd-documentation/cudd_8h.html
     // https://add-lib.scce.info/assets/documents/cudd-manual.pdf
@@ -203,6 +173,7 @@ int main(int argc, char *argv[]) {
         // Cudd_RecursiveDeref(manager, for_clause); /* Decreases the reference count of a node */
     }
 
+    
     Cudd_Ref(f); /* Increases the reference count of a node */
     #ifdef DEBUG_MODE
     Cudd_PrintDebug(manager, f, 3, 2); /* Print the BDD */
@@ -210,54 +181,88 @@ int main(int argc, char *argv[]) {
     // printf("traversal\n");
     #endif
 
-    // printf("conversion to ZDD\n");
-    // DdNode *zdd = Cudd_zddPortFromBdd(manager, f); 
-    // if (zdd == NULL) {
-    //     fprintf(stderr, "Error: Cudd_zddPortFromBdd failed\n");
-    //     return -1;
+    // int count_non_equal = 1;
+    // for(j = 0; j < var_map.n_variables_mappings; j++) {
+    //     if(var_map.variables_mappings[j].weight_true != var_map.variables_mappings[j].weight_false) {
+    //         count_non_equal++;
+    //     }
     // }
-    // Cudd_zddPrintMinterm(manager, zdd); /* Print the minterms of the BDD */
-    // Cudd_zddPrintCover(manager, zdd); /* Print the minterms of the BDD */
-    // Cudd_zddPrintMinterm(manager, zdd); /* Print the minterms of the BDD */
+    // int pos = 1;
+    
+    // int *reorder = malloc(Cudd_ReadSize(manager) * (unsigned int)theory.n_variables);
+    // reorder[0] = 0;
+    // for (i = 1; i < Cudd_ReadSize(manager); i++) {
+    //     j = Cudd_ReadInvPerm(manager, i);
+        
+    //     // printf("%d: %lf %lf\n", j, var_map.variables_mappings[j].weight_true, var_map.variables_mappings[j].weight_false);
+    //     if(var_map.variables_mappings[j].weight_true != var_map.variables_mappings[j].weight_false) {
+    //         reorder[pos] = j;
+    //         // printf("reorder[%d] = %d\n", pos, j);
+    //         pos++;
+    //     }
+    //     else {
+    //         reorder[count_non_equal] = j;
+    //         // printf("reorder[%d] = %d\n", count_non_equal, j);
+    //         count_non_equal++;
+    //     }
+    // }
 
-    // return 0;
+    // // for(j = 0; j < Cudd_ReadSize(manager); j++) {
+    // //     printf("%d -> %d\n", j, reorder[j]);
+    // // }
 
-    // if(strcmp(argv[3], "amc") == 0) {
+    // // return 0;
+    // var = Cudd_ShuffleHeap(manager, reorder);
+    // if(var == 0) {
+    //     fprintf(stderr, "Error in Cudd_ShuffleHeap\n");
+    //     Cudd_Quit(manager);
+    //     return;
+    // }
+    // printf("Reordering done\n");
+
+    // free(reorder);
+
+
     res = traverse_bdd_amc(manager, f, &var_map, &semiring); /* Traverse the BDD and print the minterms */
+
+    printf("Weight: %lf\n", res);
+    
+    Cudd_Quit(manager);
+}
+
+int main(int argc, char *argv[]) {
+    cnf theory;
+    var_mapping var_map;
+    unsigned int i;
+    semiring_t semiring = prob_semiring(); // max_times_semiring();
+    
+    var_map.n_variables_mappings = 0;
+    // // set all the variables to unused
+    // for (i = 0; i < 256; i++) {
+    //     var_map.used[i] = 0;
     // }
-    // else if(strcmp(argv[3], "amc2") == 0) {
-    //     // res = traverse_bdd_2amc(manager, f, &var_map, &semiring); /* Traverse the BDD and print the minterms */
-    // }
-    // else {
+
+    #ifdef DEBUG_MODE
+    printf("DEBUG_MODE is ON\n");
+    #endif
+
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s <cnf_file>\n", argv[0]);
+        return -1;
+    }
+    // if (strcmp(argv[2], "--task") != 0) {
     //     fprintf(stderr, "Usage: %s <cnf_file> --task TASK\n", argv[0]);
     //     return -1;
     // }
-    // double prob = compute_prob(f, &var_map);
-    printf("Weight: %lf\n", res);
-
-    // // costruisco a mano basandomi su CNF2
-    // // c 2 a 0.2
-    // // c 3 q 1
-    // // c 4 b 0.1
-    // // c 5 nq 1
-    // amc_layer_t inner_layer;
-    // semiring_t inner_semiring = prob_semiring();
-    // inner_layer.semiring = &inner_semiring;
-    // inner_layer.n_variables = 2; // a and b
-    // inner_layer.variables = malloc(sizeof(layer_variable) * inner_layer.n_variables);
-    // inner_layer.variables[0].idx_var = 0;
-    // inner_layer.variables[0].weight_true = 0.2;
-    // inner_layer.variables[0].weight_false = 1 - inner_layer.variables[0].weight_true;
-    // inner_layer.variables[1].idx_var = 2;
-    // inner_layer.variables[1].weight_true = 0.1;
-    // inner_layer.variables[1].weight_false = 1 - inner_layer.variables[1].weight_true;
-
-
-    // DdNode *bdd = Cudd_bddNewVar(manager); /*Create a new BDD variable*/
-    // Cudd_Ref(bdd); /*Increases the reference count of a node*/
-    // printf("The BDD variable is %p\n", bdd); /*Prints the address of the BDD variable*/
     
-    Cudd_Quit(manager);
+    parse_cnf(argv[1], &theory, &var_map);
 
+    #ifdef DEBUG_MODE
+    print_var_mapping(&var_map);
+    #endif
+
+    solve_with_bdd(theory, var_map, semiring);
+
+    
     return 0;
 }

@@ -7,10 +7,10 @@ void print_var_mapping(var_mapping *var_map) {
     int total = var_map->n_variables_mappings;
     int i = 0;
     while(total > 0) {
-        if (var_map->used[i] > 0) {
-            printf("Variable %d: %s, %lf, %lf\n", i, var_map->variables_mappings[i].name, var_map->variables_mappings[i].weight_true, var_map->variables_mappings[i].weight_false);
-            total--;
-        }
+        // if (var_map->used[i] > 0) {
+        printf("Variable %d: %lf, %lf\n", i, var_map->variables_mappings[i].weight_true, var_map->variables_mappings[i].weight_false);
+        total--;
+        // }
         i++;
     }
 }
@@ -79,10 +79,10 @@ void parse_cnf(char *filename, cnf *theory, var_mapping *var_map) {
             // printf("Variable %d %d\n", idx_var, index_var);
             // var_map->variables_mappings[var_map->n_variables_mappings].idx_var = idx_var;
             // var_map->variables_mappings[idx_var].idx_var = idx_var;
-            if(var_map->used[index_var] == 0) {
-                var_map->used[index_var] = 1; // Mark the variable as used
-                var_map->n_variables_mappings++;
-            }
+            // if(var_map->used[index_var] == 0) {
+            //     var_map->used[index_var] = 1; // Mark the variable as used
+            //     var_map->n_variables_mappings++;
+            // }
             
             tokenized = strtok(NULL, " "); // weight
             double weight = atof(tokenized);
