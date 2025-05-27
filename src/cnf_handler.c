@@ -88,6 +88,7 @@ void parse_cnf(char *filename, cnf *theory, var_mapping *var_map) {
             printf("Number of clauses: %d\n", theory->n_clauses);
             theory->clauses = malloc(num_clauses * sizeof(clause));
             var_map->variables_mappings = malloc((num_vars + 1) * sizeof(var));
+            var_map->n_variables_mappings = num_vars + 1;
         }
         else if (line[0] == 'w') {
             // This is the comment line
