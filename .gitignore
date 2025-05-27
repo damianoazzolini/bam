@@ -17,3 +17,4 @@ prova.c
 a.py
 a.out
 generate_cnf.py
+src/old_traverse.c

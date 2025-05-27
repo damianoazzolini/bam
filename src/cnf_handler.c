@@ -39,10 +39,8 @@ void print_var_mapping(const var_mapping *var_map) {
     int total = var_map->n_variables_mappings;
     int i = 0;
     while(total > 0) {
-        // if (var_map->used[i] > 0) {
         printf("Variable %d: %lf, %lf\n", i, var_map->variables_mappings[i].weight_true, var_map->variables_mappings[i].weight_false);
         total--;
-        // }
         i++;
     }
 }
@@ -95,6 +93,23 @@ void parse_cnf(char *filename, cnf *theory, var_mapping *var_map) {
             // w ID WEIGHT
             int idx_var = 0, index_var;
             n_read = sscanf(line, "%*s %d %lf", &idx_var, &weight);
+            if(n_read != 2) {
+                fprintf(stderr, "Error parsing line: %s\n", line);
+                fclose(fp);
+                return;
+            }
+            index_var = abs(idx_var);
+
+            if (idx_var < 0) {
+                var_map->variables_mappings[index_var].weight_false = weight;
+            } else {
+                var_map->variables_mappings[index_var].weight_true = weight;
+            }
+        }
+        else if(line[0] == 'c' && line[1] == ' ' && line[2] == 'p' && line[3] == ' ' && line[4] == 'w') {
+            // c p weight 77 0.48570815 0
+            int idx_var = 0, index_var;
+            n_read = sscanf(line, "%*s %*s %*s %d %lf %*d", &idx_var, &weight);
             if(n_read != 2) {
                 fprintf(stderr, "Error parsing line: %s\n", line);
                 fclose(fp);
