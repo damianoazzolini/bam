@@ -7,7 +7,9 @@ cnf *init_cnf() {
     cnf *theory = malloc(sizeof(cnf));
     theory->n_clauses = 0;
     theory->n_variables = 0;
+    theory->state = CNF_UNSOLVED;
     theory->clauses = NULL;
+    // theory->matrix_representation = NULL;
     return theory;
 }
 
@@ -17,9 +19,104 @@ void free_cnf(cnf *theory) {
             free(theory->clauses[i].terms);
         }
         free(theory->clauses);
+        // for (unsigned int i = 0; i < theory->n_variables; i++) {
+        //     // free(theory->matrix_representation[i]);
+        // }
         free(theory);
     }
 }
+
+void print_cnf(const cnf *theory) {
+    printf("Number of clauses: %d\n", theory->n_clauses);
+    printf("Number of variables: %d\n", theory->n_variables);
+    if(theory->state == CNF_INCONSISTENT) {
+        printf("State: CNF_INCONSISTENT\n");
+    } else if(theory->state == CNF_SOLVED) {
+        printf("State: CNF_SOLVED\n");
+    } else {
+        printf("State: CNF_UNSOLVED\n");
+    }
+    printf("State: %d\n", theory->state);
+    printf("Clauses: %d\n", theory->n_clauses);
+    for (unsigned int i = 0; i < theory->n_clauses; i++) {
+        printf("Clause %d with %d terms: ", i, theory->clauses[i].n_terms);
+        for (unsigned int j = 0; j < theory->clauses[i].n_terms; j++) {
+            printf("%d ", theory->clauses[i].terms[j]);
+        }
+        printf("\n");
+    }
+}
+
+void set_variable(cnf *theory, int idx_variable, int phase) {
+    // set the current variable and check whether the CNF became unsatisfiable 
+    // by setting the variable idx_var to true (1) or false (-1)
+    // if there is a clause with a single literal and we require that this literal
+    // is different from the phase, then unsatisfiable: return -1
+    // otherwise, if the phase is the same satisfiable: return 1
+    // else don't know: return 0
+    for (unsigned int i = 0; i < theory->n_clauses; i++) {
+        for(unsigned int j = 0; j < theory->clauses[i].n_terms; j++) {
+            int current_var = theory->clauses[i].terms[j];
+            if (abs(current_var) == idx_variable) {
+                if ((current_var > 0 && phase > 0) || (current_var < 0 && phase < 0)) {
+                    // the clause is sat: remove the whole clause
+                    theory->clauses[i].n_terms = 0; // mark the clause as satisfied
+                    free(theory->clauses[i].terms);
+                    theory->clauses[i].terms = NULL;
+                }
+                else if ((current_var > 0 && phase < 0) || (current_var < 0 && phase > 0)) {
+                    // remove the current variable from the clause
+                    if(theory->clauses[i].n_terms == 1) {
+                        // unit clause, unsat and I can stop, no need to set the variables
+                        theory->state = CNF_INCONSISTENT;
+                        return; // unsatisfiable
+                    }
+                    else {
+                        // remove the variable from the clause
+                        // printf("Removing variable %d from clause %d\n", current_var, i);
+                        // printf("nterms before removal: %d\n", theory->clauses[i].n_terms);
+                        int *new_terms = malloc((theory->clauses[i].n_terms - 1) * sizeof(int));
+                        unsigned int k = 0;
+                        // int skipped = 0;
+                        for (unsigned int l = 0; l < theory->clauses[i].n_terms; l++) {
+                            if (abs(theory->clauses[i].terms[l]) != abs(current_var)) {
+                                new_terms[k] = theory->clauses[i].terms[l];
+                                k++;
+                            }
+                        }
+                        free(theory->clauses[i].terms);
+                        // printf("nterms after removal: %d\n", k);
+                        // theory->clauses[i].n_terms--; // since there may be tautologies: v -v
+                        theory->clauses[i].n_terms = k; // since there may be tautologies: v -v
+                        theory->clauses[i].terms = new_terms;
+                    }
+                }
+            }
+        }
+    }
+
+    // check if all the clauses have been satisfied
+    for (unsigned int i = 0; i < theory->n_clauses; i++) {
+        if (theory->clauses[i].n_terms != 0) {
+            return;
+        }
+    }
+    theory->state = CNF_SOLVED; // all clauses are satisfied
+
+}
+
+// void print_cnf_matrix(const cnf *theory) {
+//     if (theory->matrix_representation == NULL) {
+//         printf("Matrix representation is NULL\n");
+//         return;
+//     }
+//     for (unsigned int i = 0; i < theory->n_clauses; i++) {
+//         for (unsigned int j = 0; j < theory->n_variables + 1; j++) {
+//             printf("%d ", theory->matrix_representation[i][j]);
+//         }
+//         printf("\n");
+//     }
+// }
 
 var_mapping *init_var_mapping() {
     var_mapping *var_map = malloc(sizeof(var_mapping)); // Allocate memory for variable mapping struct
@@ -36,13 +133,36 @@ void free_var_mapping(var_mapping *var_map) {
 }
 
 void print_var_mapping(const var_mapping *var_map) {
-    int total = var_map->n_variables_mappings;
-    int i = 0;
-    while(total > 0) {
+    for(int i = 1; i < var_map->n_variables_mappings; i++) {
         printf("Variable %d: %lf, %lf\n", i, var_map->variables_mappings[i].weight_true, var_map->variables_mappings[i].weight_false);
-        total--;
-        i++;
     }
+}
+
+int read_weight_line(char *line, var_mapping *var_map, int type) {
+    // type 0: w ID WEIGHT
+    // type 1: c p weight ID WEIGHT 0
+    int idx_var = 0, index_var, n_read = 0;
+    double weight;
+    if(type == 0) {
+        n_read = sscanf(line, "%*s %d %lf", &idx_var, &weight);
+    }
+    else if(type == 1) {
+        n_read = sscanf(line, "%*s %*s %*s %d %lf %*d", &idx_var, &weight);
+    }
+
+    if(n_read != 2) {
+        return -1;
+    }
+
+    index_var = abs(idx_var);
+
+    if (idx_var < 0) {
+        var_map->variables_mappings[index_var].weight_false = weight;
+    } else {
+        var_map->variables_mappings[index_var].weight_true = weight;
+    }
+
+    return 0;
 }
 
 void parse_cnf(char *filename, cnf *theory, var_mapping *var_map) {
@@ -51,7 +171,6 @@ void parse_cnf(char *filename, cnf *theory, var_mapping *var_map) {
     char task[32];
     unsigned int num_clauses, num_vars;
     int n_read;
-    double weight;
     unsigned int nt = 0;
     unsigned int idx_clause = 0;
 
@@ -85,42 +204,28 @@ void parse_cnf(char *filename, cnf *theory, var_mapping *var_map) {
             printf("Number of variables: %d\n", theory->n_variables);
             printf("Number of clauses: %d\n", theory->n_clauses);
             theory->clauses = malloc(num_clauses * sizeof(clause));
+
+            // theory->matrix_representation = malloc(num_clauses * sizeof(int*));
+            // for (unsigned int i = 0; i < num_vars; i++) {
+            //     theory->matrix_representation[i] = calloc(num_vars + 1, sizeof(int));
+            // }
             var_map->variables_mappings = malloc((num_vars + 1) * sizeof(var));
             var_map->n_variables_mappings = num_vars + 1;
         }
         else if (line[0] == 'w') {
-            // This is the comment line
             // w ID WEIGHT
-            int idx_var = 0, index_var;
-            n_read = sscanf(line, "%*s %d %lf", &idx_var, &weight);
-            if(n_read != 2) {
+            if(read_weight_line(line, var_map, 0) != 0) {
                 fprintf(stderr, "Error parsing line: %s\n", line);
                 fclose(fp);
                 return;
-            }
-            index_var = abs(idx_var);
-
-            if (idx_var < 0) {
-                var_map->variables_mappings[index_var].weight_false = weight;
-            } else {
-                var_map->variables_mappings[index_var].weight_true = weight;
             }
         }
         else if(line[0] == 'c' && line[1] == ' ' && line[2] == 'p' && line[3] == ' ' && line[4] == 'w') {
-            // c p weight 77 0.48570815 0
-            int idx_var = 0, index_var;
-            n_read = sscanf(line, "%*s %*s %*s %d %lf %*d", &idx_var, &weight);
-            if(n_read != 2) {
+            // c p weight ID WEIGHT 0
+            if(read_weight_line(line, var_map, 1) != 0) {
                 fprintf(stderr, "Error parsing line: %s\n", line);
                 fclose(fp);
                 return;
-            }
-            index_var = abs(idx_var);
-
-            if (idx_var < 0) {
-                var_map->variables_mappings[index_var].weight_false = weight;
-            } else {
-                var_map->variables_mappings[index_var].weight_true = weight;
             }
         }
         else if (line[0] == 'c' && line[1] == ' ' && line[2] == 'a') {
@@ -144,13 +249,37 @@ void parse_cnf(char *filename, cnf *theory, var_mapping *var_map) {
             
             char *token = strtok(line, " ");
             while (token != NULL) {
-                int var = atoi(token);
-                if (var == 0) {
+                int current_var = atoi(token);
+                if (current_var == 0) {
                     break; // End of clause
                 }
+                
+                // check: if there is a tautology, i.e., a variable and its negation in the same clause
+                // skip the clause
                 nt = theory->clauses[idx_clause].n_terms;
+                // int tautology_found = 0;
+                // for(int i = 0; i < nt; i++) {
+                //     if((abs(theory->clauses[idx_clause].terms[i]) == abs(current_var)) && (theory->clauses[idx_clause].terms[i] = -current_var)  ) {
+                //         // Tautology found, skip the clause
+                //         fprintf(stdout, "[WARNING]: tautology found in clause %d: skipping clause\n", idx_clause);
+                //         theory->clauses[idx_clause].n_terms = 0;
+                //         free(theory->clauses[idx_clause].terms);
+                //         theory->clauses[idx_clause].terms = NULL;
+                //         tautology_found = 1;
+                //         break;
+                //     }
+                // }
+                // if(tautology_found) {
+                //     break;
+                // }
                 theory->clauses[idx_clause].terms = realloc(theory->clauses[idx_clause].terms, (nt + 1) * sizeof(int)); // Resize to actual number of terms
-                theory->clauses[idx_clause].terms[nt] = var;
+                theory->clauses[idx_clause].terms[nt] = current_var;
+                // if(var > 0) {
+                //     theory->matrix_representation[idx_clause][abs(var)] = 1;
+                // }
+                // else {
+                //     theory->matrix_representation[idx_clause][abs(var)] = -1;
+                // }
                 theory->clauses[idx_clause].n_terms++;
                 token = strtok(NULL, " ");
             }

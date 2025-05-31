@@ -30,5 +30,16 @@ cnf_handler.o: src/cnf_handler.c src/cnf_handler.h
 semiring.o: src/semiring.c src/semiring.h
 	gcc -c $(CFLAGSprog) $(FLAGS) src/semiring.c -o semiring.o
 
+# tests
+test: test_cnf_handler
+	./test_cnf_handler
+
+test_cnf_handler: test_cnf_handler.o cnf_handler.o
+	gcc test_cnf_handler.o cnf_handler.o $(LDFLAGS) -o test_cnf_handler -lm
+
+test_cnf_handler.o: tests/test_cnf_handler.c src/cnf_handler.h
+	gcc -c $(CFLAGSprog) $(FLAGS) tests/test_cnf_handler.c -o test_cnf_handler.o
+
+# cleaning
 clean:
-	rm *.o bam
+	rm -f *.o bam test_cnf_handler

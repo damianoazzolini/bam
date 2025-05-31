@@ -12,11 +12,19 @@ typedef struct var {
     double weight_false;
 } var;
 
+enum cnf_state {
+    CNF_INCONSISTENT = 0,
+    CNF_SOLVED = 1, // all variables are assigned
+    CNF_UNSOLVED = 2 // general case
+};
+
 typedef struct cnf{
     unsigned int n_clauses;
     unsigned int n_variables;
+    enum cnf_state state;
     // clause clauses[256];
     clause *clauses;
+    // int **matrix_representation;
 } cnf;
 
 typedef struct var_mapping {
@@ -32,4 +40,7 @@ var_mapping *init_var_mapping();
 void free_var_mapping(var_mapping *var_map);
 
 void parse_cnf(char *filename, cnf *theory, var_mapping *var_map);
+void set_variable(cnf *theory, int idx_var, int phase);
 void print_var_mapping(const var_mapping *var_map);
+// void print_cnf_matrix(const cnf *theory);
+void print_cnf(const cnf *theory);

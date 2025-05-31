@@ -4,6 +4,8 @@
 #include <time.h>
 // #include "util.h"
 #include "cudd.h"
+// #include "cudd/cuddInt.h"
+
 // #include "cudd/cudd/cudd.h"
 // #include "cudd/cudd/cuddInt.h"
 
@@ -178,25 +180,18 @@ double traverse_bdd_aproblog(DdManager *manager, DdNode *node, const var_mapping
     return adjusted_weight;
 }
 
-void solve_with_bdd(cnf *theory, var_mapping *var_map, semiring_t semiring) {
-    DdManager *manager;
+DdNode *build_monolithic_bdd(DdManager *manager, cnf *theory) {
     DdNode *f;
-    DdNode *var_node, *tmp;
     DdNode *for_clause;
+    DdNode *var_node, *tmp;
     unsigned int i, j;
-    int var;
-    double res = 0.0;
-
-    clock_t begin = clock();
-    
-    manager = Cudd_Init(theory->n_variables,0,CUDD_UNIQUE_SLOTS,CUDD_CACHE_SLOTS,0); /* Initialize a new BDD manager. */
-    // Cudd_AutodynDisable(manager);
+    int var_index;
     f = Cudd_ReadOne(manager);
     // documentation: https://add-lib.scce.info/assets/doxygen-cudd-documentation/cudd_8h.html
     // https://add-lib.scce.info/assets/documents/cudd-manual.pdf
     // printf("n clauses: %d\n", theory->n_clauses);
     // printf("n variables: %d\n", theory->n_variables);
-    printf("Building the BDD\n");
+    printf("Building the monolithic BDD\n");
     for(i = 0; i < theory->n_clauses; i++) {
         // printf("Processing clause %d/%d\n", i, theory->n_clauses);
         for_clause = Cudd_ReadLogicZero(manager);
@@ -204,9 +199,9 @@ void solve_with_bdd(cnf *theory, var_mapping *var_map, semiring_t semiring) {
         for (j = 0; j < theory->clauses[i].n_terms; j++) {
 
             // var = abs(theory.clauses[i].terms[j]);
-            var = abs(theory->clauses[i].terms[j]);
+            var_index = abs(theory->clauses[i].terms[j]);
             // printf("pos: %d\n", var);
-            var_node = Cudd_bddIthVar(manager, var);
+            var_node = Cudd_bddIthVar(manager, var_index);
             // Cudd_Ref(vars_list[var-1]); /* Increases the reference count of a node */
             if (theory->clauses[i].terms[j] > 0) {
                 // for_clause = Cudd_bddOr(manager, for_clause, vars_list[var-1]);
@@ -229,13 +224,136 @@ void solve_with_bdd(cnf *theory, var_mapping *var_map, semiring_t semiring) {
         // Cudd_RecursiveDeref(manager, for_clause); /* Decreases the reference count of a node */
     }
 
+    Cudd_Ref(f);
+    return f;
+}
+
+DdNode *get_node(DdManager *manager, int var_index, DdNode *high, DdNode *low) {
+    DdNode *node;
+    DdNode *current;
+
+    if(low == high) {
+        Cudd_Ref(low);
+        return low;
+    }
+
+    // the commented code is wrong, I need to keep track of the variables in the BDD manager
+    // node = Cudd_ReadVars(manager, var_index);
+    // // variable exists in the manager, return it
+    // if (node != NULL) {
+    //     Cudd_Ref(node); /* Increases the reference count of a node */
+    //     return node; /* Return the BDD variable node */
+    // }
+
+    // create a new variable node
+    current = Cudd_bddIthVar(manager, var_index);
+    node = Cudd_bddIte(manager, current, high, low);
+    if (node == NULL) {
+        fprintf(stderr, "Error in get_node\n");
+        return NULL;
+    }
     
-    Cudd_Ref(f); /* Increases the reference count of a node */
+    Cudd_Ref(node);
+    return node;
+}
+
+DdNode *cnf_to_obdd_rec(DdManager *manager, cnf *theory, int variable_index) {
+    // printf("cnf_to_obdd_rec: variable_index = %d\n", variable_index);
+    // if(variable_index > theory->n_variables) {
+    //     print_cnf(theory);
+    //     return;
+    // }
+    DdNode *result;
+
+    if(theory->state == CNF_INCONSISTENT) {
+        result = Cudd_ReadLogicZero(manager); // return a constant 0 BDD
+        Cudd_Ref(result);
+        return result;
+    }
+    if(theory->state == CNF_SOLVED) {
+        result = Cudd_ReadOne(manager); // return a constant 1 BDD
+        Cudd_Ref(result);
+        return result;
+    }
+    
+    if(variable_index > theory->n_variables) {
+        // this should not happen
+        fprintf(stderr, "Error: variable_index %d exceeds number of variables %d in CNF.\n", variable_index, theory->n_variables);
+        print_cnf(theory);
+        exit(EXIT_FAILURE);
+    }
+
+    // cache lookup: TODO
+    cnf *sub_cnf_true, *sub_cnf_false;
+    sub_cnf_true = init_cnf();
+    sub_cnf_false = init_cnf();
+    // deep copy the current cnf into true and false sub-cnf
+    sub_cnf_true->n_variables = theory->n_variables;
+    sub_cnf_false->n_variables = theory->n_variables;
+    sub_cnf_true->n_clauses = theory->n_clauses;
+    sub_cnf_false->n_clauses = theory->n_clauses;
+    sub_cnf_true->clauses = malloc(theory->n_clauses * sizeof(clause));
+    sub_cnf_false->clauses = malloc(theory->n_clauses * sizeof(clause));
+    for(int i = 0; i < theory->n_clauses; i++) {
+        sub_cnf_true->clauses[i].n_terms = theory->clauses[i].n_terms;
+        sub_cnf_false->clauses[i].n_terms = theory->clauses[i].n_terms;
+        sub_cnf_true->clauses[i].terms = malloc(theory->clauses[i].n_terms * sizeof(int));
+        sub_cnf_false->clauses[i].terms = malloc(theory->clauses[i].n_terms * sizeof(int));
+        for(int j = 0; j < theory->clauses[i].n_terms; j++) {
+            sub_cnf_true->clauses[i].terms[j] = theory->clauses[i].terms[j];
+            sub_cnf_false->clauses[i].terms[j] = theory->clauses[i].terms[j];
+        }
+    }
+
+    // printf("Processing variable %d\n", variable_index);
+    printf("Removing variable %d\n", variable_index);
+    set_variable(sub_cnf_true, variable_index, 1); // set the variable to true
+    set_variable(sub_cnf_false, variable_index, -1); // set the variable to false
+    
+    // printf("CNF TRUE\n");
+    // print_cnf(sub_cnf_true);
+    // printf("CNF False\n");
+    // print_cnf(sub_cnf_false);
+
+    DdNode *true_branch, *false_branch;
+    true_branch = cnf_to_obdd_rec(manager, sub_cnf_true, variable_index + 1);
+    false_branch = cnf_to_obdd_rec(manager, sub_cnf_false, variable_index + 1);
+    
+    result = get_node(manager, variable_index, true_branch, false_branch);
+    
+    // return;
+    // add in cache: TODO
+    free_cnf(sub_cnf_true);
+    free_cnf(sub_cnf_false);
+
+    return result;
+}
+
+DdNode *cnf_to_obdd(DdManager *DdManager, cnf *theory, var_mapping *var_map) {
+    // implements the approach: https://users.cecs.anu.edu.au/~jinbo/04-sat.pdf
+    return cnf_to_obdd_rec(DdManager, theory, 1);
+    
+}
+
+void solve_with_bdd(cnf *theory, var_mapping *var_map, semiring_t semiring) {
+    DdManager *manager;
+    DdNode *f;
+    double res = 0.0;
+
+    clock_t begin = clock();
+    
+    manager = Cudd_Init(theory->n_variables,0,CUDD_UNIQUE_SLOTS,CUDD_CACHE_SLOTS,0); /* Initialize a new BDD manager. */
+    // Cudd_AutodynDisable(manager);
+
+    // f = build_monolithic_bdd(manager, theory); /* Build the BDD from the CNF formula */
+
+    f = cnf_to_obdd(manager, theory, var_map); /* Convert the CNF to an OBDD */
 
     // #ifdef DEBUG_MODE
-    // Cudd_PrintDebug(manager, f, 3, 2); /* Print the BDD */
-    // Cudd_PrintMinterm(manager, f); /* Print the minterms of the BDD */
-    // // printf("traversal\n");
+    printf("BDD:\n");
+    Cudd_PrintDebug(manager, f, 3, 2); /* Print the BDD */
+    Cudd_PrintMinterm(manager, f); /* Print the minterms of the BDD */
+    printf("traversal\n");
     // #endif
 
     clock_t end = clock();
@@ -366,7 +484,14 @@ int main(int argc, char *argv[]) {
 
     #ifdef DEBUG_MODE
     print_var_mapping(var_map);
+    print_cnf(theory);
     #endif
+    
+    // set_variable(theory, 1, 1);
+    // set_variable(theory, 2, -1);
+    // set_variable(theory, 3, -1);
+    // print_cnf(theory);
+    
 
     solve_with_bdd(theory, var_map, semiring);
 
