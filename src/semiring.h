@@ -1,3 +1,5 @@
+#pragma once
+
 #define INFINITY 1e10
 
 typedef struct semiring_t {

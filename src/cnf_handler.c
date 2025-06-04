@@ -138,7 +138,7 @@ void print_var_mapping(const var_mapping *var_map) {
     }
 }
 
-int read_weight_line(char *line, var_mapping *var_map, int type) {
+int read_weight_line(char *line, var_mapping *var_map, int num_vars, int type) {
     // type 0: w ID WEIGHT
     // type 1: c p weight ID WEIGHT 0
     int idx_var = 0, index_var, n_read = 0;
@@ -155,6 +155,11 @@ int read_weight_line(char *line, var_mapping *var_map, int type) {
     }
 
     index_var = abs(idx_var);
+
+    if(index_var > num_vars) {
+        fprintf(stderr, "Error: variable index %d out of bounds (1 to %d)\n", index_var, num_vars);
+        exit(-1);
+    }
 
     if (idx_var < 0) {
         var_map->variables_mappings[index_var].weight_false = weight;
@@ -214,7 +219,7 @@ void parse_cnf(char *filename, cnf *theory, var_mapping *var_map) {
         }
         else if (line[0] == 'w') {
             // w ID WEIGHT
-            if(read_weight_line(line, var_map, 0) != 0) {
+            if(read_weight_line(line, var_map, num_vars, 0) != 0) {
                 fprintf(stderr, "Error parsing line: %s\n", line);
                 fclose(fp);
                 return;
@@ -222,7 +227,7 @@ void parse_cnf(char *filename, cnf *theory, var_mapping *var_map) {
         }
         else if(line[0] == 'c' && line[1] == ' ' && line[2] == 'p' && line[3] == ' ' && line[4] == 'w') {
             // c p weight ID WEIGHT 0
-            if(read_weight_line(line, var_map, 1) != 0) {
+            if(read_weight_line(line, var_map, num_vars, 1) != 0) {
                 fprintf(stderr, "Error parsing line: %s\n", line);
                 fclose(fp);
                 return;
@@ -244,6 +249,11 @@ void parse_cnf(char *filename, cnf *theory, var_mapping *var_map) {
         }
         else {
             // This is a clause line
+            if(idx_clause >= theory->n_clauses) {
+                fprintf(stderr, "Error: more clauses than specified in the problem line.\n");
+                fclose(fp);
+                exit(-1);
+            }
             theory->clauses[idx_clause].n_terms = 0;
             theory->clauses[idx_clause].terms = NULL;
             
@@ -285,6 +295,11 @@ void parse_cnf(char *filename, cnf *theory, var_mapping *var_map) {
             }
             idx_clause++;
         }
+    }
+
+    printf("Parsed %d clauses.\n", idx_clause);
+    if (idx_clause != theory->n_clauses) {
+        fprintf(stderr, "Error: number of clauses parsed (%d) does not match the number specified in the problem line (%d).\n", idx_clause, theory->n_clauses);
     }
 
     fclose(fp);
