@@ -26,6 +26,17 @@ void free_cnf(cnf *theory) {
     }
 }
 
+char *get_weight_string(weight_t weight, int weight_type) {
+    char *weight_str = malloc(32 * sizeof(char));
+    if(weight_type == 0) {
+        snprintf(weight_str, 32, "%lf", weight.real_weight);
+    }
+    else if(weight_type == 1) {
+        snprintf(weight_str, 32, "%lf+%lfi", weight.complex_weight.real, weight.complex_weight.imag);
+    }
+    return weight_str;
+}
+
 void print_cnf(const cnf *theory) {
     printf("Number of clauses: %d\n", theory->n_clauses);
     printf("Number of variables: %d\n", theory->n_variables);
@@ -132,25 +143,46 @@ void free_var_mapping(var_mapping *var_map) {
     }
 }
 
-void print_var_mapping(const var_mapping *var_map) {
+void print_var_mapping(const var_mapping *var_map, int weight_type) {
+    char *weight_true_string, *weight_false_string;
     for(int i = 1; i < var_map->n_variables_mappings; i++) {
-        printf("Variable %d: %lf, %lf\n", i, var_map->variables_mappings[i].weight_true, var_map->variables_mappings[i].weight_false);
+        weight_true_string = get_weight_string(var_map->variables_mappings[i].weight_true, weight_type);
+        weight_false_string = get_weight_string(var_map->variables_mappings[i].weight_false, weight_type);
+        printf("Variable %d: %s, %s\n", i, weight_true_string, weight_false_string);
+        free(weight_true_string);
+        free(weight_false_string);
     }
 }
 
-int read_weight_line(char *line, var_mapping *var_map, int num_vars, int type) {
+// weight_value = 0 -> real weight
+// weight_value = 1 -> complex weight
+int read_weight_line(char *line, var_mapping *var_map, int num_vars, int type, int weight_type) {
     // type 0: w ID WEIGHT
     // type 1: c p weight ID WEIGHT 0
     int idx_var = 0, index_var, n_read = 0;
-    double weight;
+    weight_t weight;
     if(type == 0) {
-        n_read = sscanf(line, "%*s %d %lf", &idx_var, &weight);
+        if(weight_type == 0) {
+            n_read = sscanf(line, "%*s %d %lf", &idx_var, &weight.real_weight);
+        }
+        else if(weight_type == 1) {
+            char imag_weight_s[16];
+            n_read = sscanf(line, "%*s %d %lf+%s", &idx_var, &weight.complex_weight.real, imag_weight_s);
+            weight.complex_weight.imag = atof(imag_weight_s);
+        }
     }
     else if(type == 1) {
-        n_read = sscanf(line, "%*s %*s %*s %d %lf %*d", &idx_var, &weight);
+        if(weight_type == 0) {
+            n_read = sscanf(line, "%*s %*s %*s %d %lf %*d", &idx_var, &weight.real_weight);
+        }
+        else if(weight_type == 1) {
+            char imag_weight_s[16];
+            n_read = sscanf(line, "%*s %*s %*s %d %lf+%s %*d", &idx_var, &weight.complex_weight.real, imag_weight_s);
+            weight.complex_weight.imag = atof(imag_weight_s);
+        }
     }
 
-    if(n_read != 2) {
+    if(weight_type == 0 && n_read != 2 || weight_type == 1 && n_read != 3) {
         return -1;
     }
 
@@ -170,7 +202,9 @@ int read_weight_line(char *line, var_mapping *var_map, int num_vars, int type) {
     return 0;
 }
 
-void parse_cnf(char *filename, cnf *theory, var_mapping *var_map) {
+// weight_value = 0 -> real weight
+// weight_value = 1 -> complex weight
+void parse_cnf(char *filename, cnf *theory, var_mapping *var_map, int weight_type) {
     FILE *fp;
     char line[256];
     char task[32];
@@ -202,7 +236,7 @@ void parse_cnf(char *filename, cnf *theory, var_mapping *var_map) {
             if(n_read != 3) {
                 fprintf(stderr, "Error parsing line: %s\n", line);
                 fclose(fp);
-                return;
+                exit(-1);
             }
             theory->n_variables = num_vars;
             theory->n_clauses = num_clauses;
@@ -219,18 +253,18 @@ void parse_cnf(char *filename, cnf *theory, var_mapping *var_map) {
         }
         else if (line[0] == 'w') {
             // w ID WEIGHT
-            if(read_weight_line(line, var_map, num_vars, 0) != 0) {
+            if(read_weight_line(line, var_map, num_vars, 0, weight_type) != 0) {
                 fprintf(stderr, "Error parsing line: %s\n", line);
                 fclose(fp);
-                return;
+                exit(-1);
             }
         }
         else if(line[0] == 'c' && line[1] == ' ' && line[2] == 'p' && line[3] == ' ' && line[4] == 'w') {
             // c p weight ID WEIGHT 0
-            if(read_weight_line(line, var_map, num_vars, 1) != 0) {
+            if(read_weight_line(line, var_map, num_vars, 1, weight_type) != 0) {
                 fprintf(stderr, "Error parsing line: %s\n", line);
                 fclose(fp);
-                return;
+                exit(-1);
             }
         }
         else if (line[0] == 'c' && line[1] == ' ' && line[2] == 'a') {

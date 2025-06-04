@@ -17,7 +17,7 @@
 
 
 
-void insert_cache(cache **cache_list, DdNode *node_pointer, const char *set, int n_items_in_set, double weight) {
+void insert_cache(cache **cache_list, DdNode *node_pointer, const char *set, int n_items_in_set, weight_t weight) {
     cache *new_entry = malloc(sizeof(cache));
     new_entry->node_pointer = node_pointer;
     new_entry->n_items_in_set = n_items_in_set;
@@ -29,7 +29,7 @@ void insert_cache(cache **cache_list, DdNode *node_pointer, const char *set, int
     *cache_list = new_entry;
 }
 
-double cache_lookup(cache *cache_list, DdNode *node_pointer, char **set) {
+weight_t cache_lookup(cache *cache_list, DdNode *node_pointer, char **set) {
     cache *current = cache_list;
     while (current != NULL) {
         if (current->node_pointer == node_pointer) {
@@ -38,14 +38,16 @@ double cache_lookup(cache *cache_list, DdNode *node_pointer, char **set) {
         }
         current = current->next;
     }
-    return -1; // not found
+    
+    return (weight_t) { .real_weight = 0.0 };
 }
 
 void print_cache(cache *cache_list) {
     cache *current = cache_list;
     while (current != NULL) {
         // printf("Cache entry: node_index = %d, terminal = %d, hash = %lu, weight = %lf, set = {", 
-        printf("Cache entry: node_pointer = %p (%d), weight: %lf, set = {", current->node_pointer, Cudd_NodeReadIndex(current->node_pointer), current->weight);
+        // printf("Cache entry: node_pointer = %p (%d), weight: %lf, set = {", current->node_pointer, Cudd_NodeReadIndex(current->node_pointer), current->weight);
+        printf("Cache entry: node_pointer = %p (%d), set = {", current->node_pointer, Cudd_NodeReadIndex(current->node_pointer));
         for(int i = 0; i < current->n_items_in_set; i++) {
             if(current->set[i] > 0) {
                 printf("%d ", i);
@@ -84,9 +86,10 @@ label traverse_bdd_aproblog_rec(DdManager *manager, DdNode *node, const var_mapp
     }
 
     char *set = NULL;
+    int found = 0;
     unsigned int index = Cudd_NodeReadIndex(node);
-    double res = cache_lookup(*cache_list, Cudd_Regular(node), &set);
-    if(res > 0) { // found in cache
+    weight_t res = cache_lookup(*cache_list, Cudd_Regular(node), &set);
+    if(set != NULL) { // found in cache
         label result_cached;
         result_cached.set = calloc(var_map->n_variables_mappings, sizeof(char));
         result_cached.weight = res;
@@ -103,11 +106,11 @@ label traverse_bdd_aproblog_rec(DdManager *manager, DdNode *node, const var_mapp
     high_label = traverse_bdd_aproblog_rec(manager, Cudd_T(node), var_map, semiring, cache_list);
     low_label = traverse_bdd_aproblog_rec(manager, Cudd_E(node), var_map, semiring, cache_list);
     
-    double plh, phl;
-    int i; //, index;
-    double temp_value_vl_minus_vh = semiring->neutral_mul;
-    double temp_value_vh_minus_vl = semiring->neutral_mul;
-    double temp_result, current_weight_true, current_weight_false;
+    int i;
+    weight_t plh, phl;
+    weight_t temp_value_vl_minus_vh = semiring->neutral_mul;
+    weight_t temp_value_vh_minus_vl = semiring->neutral_mul;
+    weight_t temp_result, current_weight_true, current_weight_false;
 
     for(i = 0; i < var_map->n_variables_mappings; i++) {
         if(high_label.set[i] > 0 || low_label.set[i] > 0) {
@@ -138,27 +141,32 @@ label traverse_bdd_aproblog_rec(DdManager *manager, DdNode *node, const var_mapp
     return result;
 }
 
-double traverse_bdd_aproblog(DdManager *manager, DdNode *node, const var_mapping *var_map, const semiring_t *semiring) {
+weight_t traverse_bdd_aproblog(DdManager *manager, DdNode *node, const var_mapping *var_map, const semiring_t *semiring, int weight_type) {
     label result;
     cache **cache_list = malloc(sizeof(cache*));
     *cache_list = NULL; // Initialize the cache list
-    double adjusted_weight = 0;
-    double current_weight_true, current_weight_false;
+    weight_t current_weight_true, current_weight_false;
+    char *weight_string;
     
     result = traverse_bdd_aproblog_rec(manager, node, var_map, semiring, cache_list);
-
+    
     // print_cache(*cache_list);
+    
+    weight_t adjusted_weight = result.weight;
+    weight_string = get_weight_string(adjusted_weight, weight_type);
+    printf("ADD weight: %s\n", weight_string);
+    free(weight_string);
 
-    adjusted_weight = result.weight;
-
-    printf("ADD weight: %lf\n", adjusted_weight);
     for(int i = 1; i < var_map->n_variables_mappings; i++) {
         if(result.set[i] == 0) {
             // mul
             current_weight_true = semiring->mul(var_map->variables_mappings[i].weight_true, adjusted_weight);
             current_weight_false = semiring->mul(var_map->variables_mappings[i].weight_false, adjusted_weight);
             adjusted_weight = semiring->add(current_weight_true, current_weight_false);
-            printf("Variable %d is not in the set, adjusting weight: %lf\n", i, adjusted_weight);
+
+            weight_string = get_weight_string(adjusted_weight, weight_type);
+            printf("Variable %d is not in the set, adjusting weight: %s\n", i, weight_string);
+            free(weight_string);
         }
     }
 
@@ -450,10 +458,10 @@ DdNode *cnf_to_obdd(DdManager *DdManager, cnf *theory) {
     return result;
 }
 
-double solve_with_bdd(cnf *theory, var_mapping *var_map, semiring_t semiring, int compilation_type) {
+weight_t solve_with_bdd(cnf *theory, var_mapping *var_map, semiring_t semiring, int compilation_type, int weight_type) {
     DdManager *manager;
     DdNode *f = NULL;
-    double res = 0.0;
+    weight_t res;
 
     clock_t begin = clock();
     
@@ -539,7 +547,7 @@ double solve_with_bdd(cnf *theory, var_mapping *var_map, semiring_t semiring, in
     if (add_root == NULL) {
         fprintf(stderr, "Error in Cudd_addBddToAdd\n");
         Cudd_Quit(manager);
-        return 0;
+        exit(-1);
     }
     int constant = Cudd_IsConstant(add_root);
     if (constant) {
@@ -558,14 +566,16 @@ double solve_with_bdd(cnf *theory, var_mapping *var_map, semiring_t semiring, in
     printf("Traversing the ADD\n");
     // label res_label;
     begin = clock();
-    res = traverse_bdd_aproblog(manager, add_root, var_map, &semiring);
+    res = traverse_bdd_aproblog(manager, add_root, var_map, &semiring, weight_type);
     // printf("Weight: %lf\n", res_label.weight);
     end = clock();
     time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
     printf("Time spent traversing the ADD: %lf seconds\n", time_spent);
     // res = traverse_bdd_amc(manager, f, var_map, &semiring); /* Traverse the BDD and print the minterms */
 
-    printf("Weight: %lf\n", res);
+    char *weight_string = get_weight_string(res, weight_type);
+    printf("Weight: %s\n", weight_string);
+    free(weight_string);
     
     Cudd_Quit(manager);
 
@@ -575,7 +585,8 @@ double solve_with_bdd(cnf *theory, var_mapping *var_map, semiring_t semiring, in
 int main(int argc, char *argv[]) {
     cnf *theory = init_cnf();
     var_mapping *var_map = init_var_mapping();
-    semiring_t semiring = prob_semiring(); // max_times_semiring();
+    semiring_t semiring = prob_semiring(0); // max_times_semiring();
+    int weight_type = 0; // 0 for real, 1 for complex
 
     int compilation_type = 1; // 0 monolithic, 1 cutset
 
@@ -594,13 +605,23 @@ int main(int argc, char *argv[]) {
             return -1;
         }
         if (strcmp(argv[4], "max_times") == 0) {
+            weight_type = 0;
+            semiring = max_times_semiring();
+        }
+        if (strcmp(argv[4], "complex_max_times") == 0) {
+            weight_type = 1;
             semiring = max_times_semiring();
         }
         else if (strcmp(argv[4], "min_times") == 0) {
             semiring = min_times_semiring();
         }
         else if (strcmp(argv[4], "prob") == 0) {
-            semiring = prob_semiring();
+            weight_type = 0;
+            semiring = prob_semiring(0);
+        }
+        else if (strcmp(argv[4], "complex_prob") == 0) {
+            weight_type = 1;
+            semiring = prob_semiring(1);
         }
         else {
             fprintf(stderr, "Semiring not implemented: %s\n", argv[4]);
@@ -616,10 +637,10 @@ int main(int argc, char *argv[]) {
     printf("DEBUG_MODE is ON\n");
     #endif
     
-    parse_cnf(argv[1], theory, var_map);
+    parse_cnf(argv[1], theory, var_map, weight_type);
 
     #ifdef DEBUG_MODE
-    print_var_mapping(var_map);
+    print_var_mapping(var_map, weight_type);
     print_cnf(theory);
     #endif
     
@@ -629,7 +650,7 @@ int main(int argc, char *argv[]) {
     // print_cnf(theory);
     
 
-    solve_with_bdd(theory, var_map, semiring, compilation_type);
+    solve_with_bdd(theory, var_map, semiring, compilation_type, weight_type);
 
     free_cnf(theory);
     free_var_mapping(var_map);

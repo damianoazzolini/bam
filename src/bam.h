@@ -5,7 +5,7 @@
 
 // aproblog cache
 typedef struct label {
-    double weight;
+    weight_t weight;
     // char set[MAX_VAR];
     char *set;
 } label;
@@ -14,7 +14,7 @@ typedef struct cache {
     DdNode *node_pointer;
     int n_items_in_set; // this is the same for each cache entry, var_map->n_variables_mappings
     char *set;
-    double weight;
+    weight_t weight;
     struct cache *next; // pointer to the next cache entry
 } cache;
 
@@ -41,4 +41,4 @@ typedef struct cutset_cache_t {
 } cutset_cache_t;
 
 
-double solve_with_bdd(cnf *theory, var_mapping *var_map, semiring_t semiring, int compilation_type);
+weight_t solve_with_bdd(cnf *theory, var_mapping *var_map, semiring_t semiring, int compilation_type, int weight_type);
