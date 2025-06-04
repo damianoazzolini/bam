@@ -240,8 +240,8 @@ void parse_cnf(char *filename, cnf *theory, var_mapping *var_map, int weight_typ
             }
             theory->n_variables = num_vars;
             theory->n_clauses = num_clauses;
-            printf("Number of variables: %d\n", theory->n_variables);
-            printf("Number of clauses: %d\n", theory->n_clauses);
+            printf("c Number of variables: %d\n", theory->n_variables);
+            printf("c Number of clauses: %d\n", theory->n_clauses);
             theory->clauses = malloc(num_clauses * sizeof(clause));
 
             // theory->matrix_representation = malloc(num_clauses * sizeof(int*));
@@ -331,7 +331,7 @@ void parse_cnf(char *filename, cnf *theory, var_mapping *var_map, int weight_typ
         }
     }
 
-    printf("Parsed %d clauses.\n", idx_clause);
+    printf("c Parsed %d clauses.\n", idx_clause);
     if (idx_clause != theory->n_clauses) {
         fprintf(stderr, "Error: number of clauses parsed (%d) does not match the number specified in the problem line (%d).\n", idx_clause, theory->n_clauses);
     }

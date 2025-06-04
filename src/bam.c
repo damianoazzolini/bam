@@ -154,7 +154,7 @@ weight_t traverse_bdd_aproblog(DdManager *manager, DdNode *node, const var_mappi
     
     weight_t adjusted_weight = result.weight;
     weight_string = get_weight_string(adjusted_weight, weight_type);
-    printf("ADD weight: %s\n", weight_string);
+    printf("c ADD weight: %s\n", weight_string);
     free(weight_string);
 
     for(int i = 1; i < var_map->n_variables_mappings; i++) {
@@ -187,7 +187,7 @@ DdNode *build_monolithic_bdd(DdManager *manager, cnf *theory) {
     // https://add-lib.scce.info/assets/documents/cudd-manual.pdf
     // printf("n clauses: %d\n", theory->n_clauses);
     // printf("n variables: %d\n", theory->n_variables);
-    printf("Building the monolithic BDD\n");
+    printf("c Building the monolithic BDD\n");
     for(i = 0; i < theory->n_clauses; i++) {
         // printf("Processing clause %d/%d\n", i, theory->n_clauses);
         for_clause = Cudd_ReadLogicZero(manager);
@@ -469,11 +469,11 @@ weight_t solve_with_bdd(cnf *theory, var_mapping *var_map, semiring_t semiring, 
     // Cudd_AutodynDisable(manager);
 
     if(compilation_type == 0) {
-        printf("Monolithic BDD compilation\n");
+        printf("c Monolithic BDD compilation\n");
         f = build_monolithic_bdd(manager, theory); /* Build the BDD from the CNF formula */
     }
     else if(compilation_type == 1) {
-        printf("Cutset BDD compilation\n");
+        printf("c Cutset BDD compilation\n");
         f = cnf_to_obdd(manager, theory); /* Convert the CNF to an OBDD */
     }
 
@@ -486,7 +486,7 @@ weight_t solve_with_bdd(cnf *theory, var_mapping *var_map, semiring_t semiring, 
 
     clock_t end = clock();
     double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    printf("Time spent building the BDD: %lf seconds\n", time_spent);
+    printf("c Time spent building the BDD: %lf seconds\n", time_spent);
 
     // int count_non_equal = 1;
     // for(j = 0; j < var_map.n_variables_mappings; j++) {
@@ -535,13 +535,13 @@ weight_t solve_with_bdd(cnf *theory, var_mapping *var_map, semiring_t semiring, 
     //     return;
     // }
 
-    printf("Init conversion\n");
+    printf("c Init conversion\n");
     begin = clock();
     DdNode *add_root = Cudd_BddToAdd(manager, f); /* Convert the BDD to an ADD */
     // printf("Conversion done\n");
     end = clock();
     time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    printf("Time spent converting the BDD to an ADD: %lf seconds\n", time_spent);
+    printf("c Time spent converting the BDD to an ADD: %lf seconds\n", time_spent);
     // fflush(stdout);
     // since ADDs have 0/1 terminals while BDDs have only 1 and complemented arcs
     if (add_root == NULL) {
@@ -551,11 +551,11 @@ weight_t solve_with_bdd(cnf *theory, var_mapping *var_map, semiring_t semiring, 
     }
     int constant = Cudd_IsConstant(add_root);
     if (constant) {
-        printf("ADD root node is constant\n");
+        printf("c ADD root node is constant\n");
     }
     else {
-        printf("ADD root node is not constant\n");
-        printf("ADD root node index: %d\n", Cudd_NodeReadIndex(add_root));
+        printf("c ADD root node is not constant\n");
+        printf("c ADD root node index: %d\n", Cudd_NodeReadIndex(add_root));
     }
     // #ifdef DEBUG_MODE
     // Cudd_PrintDebug(manager, add_root, 3, 2); /* Print the BDD */
@@ -563,18 +563,21 @@ weight_t solve_with_bdd(cnf *theory, var_mapping *var_map, semiring_t semiring, 
     // // printf("traversal\n");
     // #endif
 
-    printf("Traversing the ADD\n");
+    printf("c Traversing the ADD\n");
     // label res_label;
     begin = clock();
     res = traverse_bdd_aproblog(manager, add_root, var_map, &semiring, weight_type);
     // printf("Weight: %lf\n", res_label.weight);
     end = clock();
     time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    printf("Time spent traversing the ADD: %lf seconds\n", time_spent);
+    printf("c Time spent traversing the ADD: %lf seconds\n", time_spent);
     // res = traverse_bdd_amc(manager, f, var_map, &semiring); /* Traverse the BDD and print the minterms */
 
     char *weight_string = get_weight_string(res, weight_type);
-    printf("Weight: %s\n", weight_string);
+    printf("c Final weight\n");
+    printf("c ==============================\n\n");
+    printf("%s\n", weight_string);
+    printf("\nc ==============================\n");
     free(weight_string);
     
     Cudd_Quit(manager);
@@ -627,21 +630,21 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "Semiring not implemented: %s\n", argv[4]);
             return -1;
         }
-        printf("Semiring: %s\n", argv[4]);
+        printf("c Semiring: %s\n", argv[4]);
     }
     else {
-        printf("Default semiring: prob/WMC\n");
+        printf("c Default semiring: prob/WMC\n");
     }
     
     #ifdef DEBUG_MODE
-    printf("DEBUG_MODE is ON\n");
+    printf("c DEBUG_MODE is ON\n");
     #endif
     
     parse_cnf(argv[1], theory, var_map, weight_type);
 
     #ifdef DEBUG_MODE
-    print_var_mapping(var_map, weight_type);
-    print_cnf(theory);
+    // print_var_mapping(var_map, weight_type);
+    // print_cnf(theory);
     #endif
     
     // set_variable(theory, 1, 1);
