@@ -97,7 +97,7 @@ semiring_t min_times_semiring() {
 }
 semiring_t max_plus_semiring_() {
     semiring_t semiring;
-    weight_t neutral_add = { .real_weight = -INFINITY };
+    weight_t neutral_add = { .real_weight = -MY_INFINITY };
     weight_t neutral_mul = { .real_weight = 0.0 };
     semiring.add = max;
     semiring.mul = add;

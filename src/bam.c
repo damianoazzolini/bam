@@ -501,6 +501,9 @@ weight_t solve_with_bdd(cnf *theory, var_mapping *var_map, semiring_t semiring, 
     clock_t end = clock();
     double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
     printf("c Time spent building the BDD: %lf seconds\n", time_spent);
+    #ifdef DEBUG_MODE
+    printf("c Number of nodes: %d\n", Cudd_DagSize(f));
+    #endif
 
     // reorder the bdd
     printf("c Reordering the BDD\n");
@@ -555,13 +558,13 @@ weight_t solve_with_bdd(cnf *theory, var_mapping *var_map, semiring_t semiring, 
 
     char *weight_string = get_weight_string(res, weight_type);
     printf("c Final weight\n");
-    printf("c ==============================\n\n");
+    printf("c ==============================\n");
     if(weight_type == 0) {
         printf("c s log10-estimate %lf\n", log10(res.real_weight));
     }
     // printf("c s log10-estimate %lf\n", log10(res.real_weight));
     printf("c s exact double float %s\n", weight_string);
-    printf("\nc ==============================\n");
+    printf("c ==============================\n");
     free(weight_string);
     
     Cudd_Quit(manager);

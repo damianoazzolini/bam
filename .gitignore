@@ -19,3 +19,5 @@ a.out
 generate_cnf.py
 src/old_traverse.c
 k.py
+run_valgrind.sh
+notes.txt

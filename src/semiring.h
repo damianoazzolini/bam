@@ -1,7 +1,7 @@
 #pragma once
 #include "cnf_handler.h"
 
-#define INFINITY 1e30
+#define MY_INFINITY 1e30
 
 
 typedef struct semiring_t {

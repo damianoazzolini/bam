@@ -1,0 +1,1 @@
+./bam $1 mono -s complex_prob
