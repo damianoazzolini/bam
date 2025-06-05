@@ -55,4 +55,5 @@ void set_variable(cnf *theory, int idx_var, int phase);
 void print_var_mapping(const var_mapping *var_map, int weight_type);
 // void print_cnf_matrix(const cnf *theory);
 void print_cnf(const cnf *theory);
+int *compute_stats_cnf(const cnf *theory);
 char *get_weight_string(weight_t weight, int weight_type);

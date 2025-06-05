@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -86,7 +87,6 @@ label traverse_bdd_aproblog_rec(DdManager *manager, DdNode *node, const var_mapp
     }
 
     char *set = NULL;
-    int found = 0;
     unsigned int index = Cudd_NodeReadIndex(node);
     weight_t res = cache_lookup(*cache_list, Cudd_Regular(node), &set);
     if(set != NULL) { // found in cache
@@ -165,7 +165,7 @@ weight_t traverse_bdd_aproblog(DdManager *manager, DdNode *node, const var_mappi
             adjusted_weight = semiring->add(current_weight_true, current_weight_false);
 
             weight_string = get_weight_string(adjusted_weight, weight_type);
-            printf("Variable %d is not in the set, adjusting weight: %s\n", i, weight_string);
+            printf("c Variable %d is not in the set, adjusting weight: %s\n", i, weight_string);
             free(weight_string);
         }
     }
@@ -458,6 +458,20 @@ DdNode *cnf_to_obdd(DdManager *DdManager, cnf *theory) {
     return result;
 }
 
+void reorder_bdd(DdManager *manager, const cnf *theory, DdNode *f) {
+    int result;
+    int *order = compute_stats_cnf(theory);
+    result = Cudd_ShuffleHeap(manager, order);
+    if(result == 0) {
+        fprintf(stderr, "Error in Cudd_ShuffleHeap\n");
+        Cudd_Quit(manager);
+        return;
+    }
+    printf("c Reordering done\n");
+
+    free(order);
+}
+
 weight_t solve_with_bdd(cnf *theory, var_mapping *var_map, semiring_t semiring, int compilation_type, int weight_type) {
     DdManager *manager;
     DdNode *f = NULL;
@@ -488,52 +502,13 @@ weight_t solve_with_bdd(cnf *theory, var_mapping *var_map, semiring_t semiring, 
     double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
     printf("c Time spent building the BDD: %lf seconds\n", time_spent);
 
-    // int count_non_equal = 1;
-    // for(j = 0; j < var_map.n_variables_mappings; j++) {
-    //     if(var_map.variables_mappings[j].weight_true != var_map.variables_mappings[j].weight_false) {
-    //         count_non_equal++;
-    //     }
-    // }
-    // int pos = 1;
-    
-    // int *reorder = malloc(Cudd_ReadSize(manager) * (unsigned int)theory.n_variables);
-    // reorder[0] = 0;
-    // for (i = 1; i < Cudd_ReadSize(manager); i++) {
-    //     j = Cudd_ReadInvPerm(manager, i);
-        
-    //     // printf("%d: %lf %lf\n", j, var_map.variables_mappings[j].weight_true, var_map.variables_mappings[j].weight_false);
-    //     if(var_map.variables_mappings[j].weight_true != var_map.variables_mappings[j].weight_false) {
-    //         reorder[pos] = j;
-    //         // printf("reorder[%d] = %d\n", pos, j);
-    //         pos++;
-    //     }
-    //     else {
-    //         reorder[count_non_equal] = j;
-    //         // printf("reorder[%d] = %d\n", count_non_equal, j);
-    //         count_non_equal++;
-    //     }
-    // }
-
-    // // for(j = 0; j < Cudd_ReadSize(manager); j++) {
-    // //     printf("%d -> %d\n", j, reorder[j]);
-    // // }
-
-    // // return 0;
-    // var = Cudd_ShuffleHeap(manager, reorder);
-    // if(var == 0) {
-    //     fprintf(stderr, "Error in Cudd_ShuffleHeap\n");
-    //     Cudd_Quit(manager);
-    //     return;
-    // }
-    // printf("Reordering done\n");
-
-    // free(reorder);
-
-    // if(var_map->n_variables_mappings > MAX_VAR) {
-    //     printf("Error, hardcoded max var: %d\n", MAX_VAR);
-    //     Cudd_Quit(manager);
-    //     return;
-    // }
+    // reorder the bdd
+    printf("c Reordering the BDD\n");
+    begin = clock();
+    reorder_bdd(manager, theory, f);
+    end = clock();
+    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+    printf("c Time spent reordering the BDD: %lf seconds\n", time_spent);
 
     printf("c Init conversion\n");
     begin = clock();
@@ -551,11 +526,16 @@ weight_t solve_with_bdd(cnf *theory, var_mapping *var_map, semiring_t semiring, 
     }
     int constant = Cudd_IsConstant(add_root);
     if (constant) {
-        printf("c ADD root node is constant\n");
+        int v = (int)Cudd_V(add_root);
+        printf("c ADD root node is constant: %d\n", v);
+        if(v == 0) {
+            printf("s UNSATISFIABLE\n");
+        }
     }
     else {
         printf("c ADD root node is not constant\n");
         printf("c ADD root node index: %d\n", Cudd_NodeReadIndex(add_root));
+        printf("s SATISFIABLE\n");
     }
     // #ifdef DEBUG_MODE
     // Cudd_PrintDebug(manager, add_root, 3, 2); /* Print the BDD */
@@ -576,7 +556,11 @@ weight_t solve_with_bdd(cnf *theory, var_mapping *var_map, semiring_t semiring, 
     char *weight_string = get_weight_string(res, weight_type);
     printf("c Final weight\n");
     printf("c ==============================\n\n");
-    printf("%s\n", weight_string);
+    if(weight_type == 0) {
+        printf("c s log10-estimate %lf\n", log10(res.real_weight));
+    }
+    // printf("c s log10-estimate %lf\n", log10(res.real_weight));
+    printf("c s exact double float %s\n", weight_string);
     printf("\nc ==============================\n");
     free(weight_string);
     
@@ -594,6 +578,7 @@ int main(int argc, char *argv[]) {
     int compilation_type = 1; // 0 monolithic, 1 cutset
 
     // printf("argc: %d\n", argc);
+    // time timeout 300 ./bam cnfs/CNF_complex_weights mono -s complex_prob
     if (argc < 3) {
         fprintf(stderr, "Usage: %s <cnf_file> <compilation>\n", argv[0]);
         return -1;
@@ -645,6 +630,7 @@ int main(int argc, char *argv[]) {
     #ifdef DEBUG_MODE
     // print_var_mapping(var_map, weight_type);
     // print_cnf(theory);
+    // compute_stats_cnf(theory);
     #endif
     
     // set_variable(theory, 1, 1);

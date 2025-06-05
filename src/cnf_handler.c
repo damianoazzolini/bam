@@ -202,6 +202,57 @@ int read_weight_line(char *line, var_mapping *var_map, int num_vars, int type, i
     return 0;
 }
 
+int *compute_stats_cnf(const cnf *theory) {
+    int *term_occurrences_pos = calloc(theory->n_variables + 1, sizeof(int));
+    int *term_occurrences_neg = calloc(theory->n_variables + 1, sizeof(int));
+    int *term_occurrences = calloc(theory->n_variables + 1, sizeof(int));
+    int *order = calloc(theory->n_variables + 1, sizeof(int));
+
+    for (unsigned int i = 0; i < theory->n_clauses; i++) {
+        for (unsigned int j = 0; j < theory->clauses[i].n_terms; j++) {
+            int term = theory->clauses[i].terms[j];
+            if (term > 0) {
+                term_occurrences_pos[term]++;
+            }
+            else {
+                term_occurrences_neg[-term]++;
+            }
+            term_occurrences[abs(term)]++;
+        }
+    }
+
+    // sort the term_occurrences array and then sort the variables by the number of occurrences
+    int *sorted_indices = malloc(theory->n_variables * sizeof(int));
+    for(int i = 1; i <= theory->n_variables; i++) {
+        sorted_indices[i - 1] = i;
+    }
+    // sort the indices by the number of occurrences
+    for(int i = 0; i < theory->n_variables - 1; i++) {
+        for(int j = i + 1; j < theory->n_variables; j++) {
+            if(term_occurrences[sorted_indices[i]] < term_occurrences[sorted_indices[j]]) {
+                int temp = sorted_indices[i];
+                sorted_indices[i] = sorted_indices[j];
+                sorted_indices[j] = temp;
+            }
+        }
+    }
+    for(int i = 0; i < theory->n_variables; i++) {
+        order[sorted_indices[i]] = i + 1;
+    }
+
+    #ifdef DEBUG_MODE
+    for(int i = 1; i <= theory->n_variables; i++) {
+        printf("c Variable %d: (%d,%d) = %d (%d)\n", i, term_occurrences_pos[i], term_occurrences_neg[i], term_occurrences[i], order[i]);
+    }
+    #endif
+    
+    free(term_occurrences_pos);
+    free(term_occurrences_neg);
+    free(term_occurrences);
+
+    return order;
+}
+
 // weight_value = 0 -> real weight
 // weight_value = 1 -> complex weight
 void parse_cnf(char *filename, cnf *theory, var_mapping *var_map, int weight_type) {

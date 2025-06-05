@@ -7,7 +7,6 @@ LDFLAGS= $(LDSOFLAGS) -Lcudd/cudd/.libs/ -lcudd
 
 DEBUGFLAGS = -g -O2 -Wall -Wextra -Wformat=2 -Wconversion -Wimplicit-fallthrough -Werror=format-security -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3 -D_GLIBCXX_ASSERTIONS -fstack-clash-protection -fstack-protector-strong -Wl,-z,nodlopen -Wl,-z,noexecstack -Wl,-z,relro -Wl,-z,now -Wl,--as-needed -Wl,--no-copy-dt-needed-entries -DDEBUG_MODE
 
-DEBUG ?= 1
 ifeq ($(DEBUG), 1)
     FLAGS = $(DEBUGFLAGS)
 else
