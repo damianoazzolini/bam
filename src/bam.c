@@ -288,6 +288,9 @@ void print_cutset_cache(cutset_cache_t *cutset_cache) {
         printf("Variable %d: n_cutset = %d\n", i + 1, entry->n_cutset);
         for(int j = 0; j < entry->n_cutset; j++) {
             printf("  Cutset %d: key = %s, n_clauses = %d\n", j + 1, entry->cutset[j].key, entry->cutset[j].n_clauses);
+            // for(int k = 0; k < entry->cutset[j].n_clauses; k++) {
+            //     printf("    Clause %d: %d\n", k + 1, entry->cutset[j].cutset[k]);
+            // }
         }
     }
 }
@@ -367,13 +370,14 @@ int *compute_cutset(cnf *theory, int variable_index, char *key) {
     return cutset;
 }
 
-DdNode *cnf_to_obdd_rec(DdManager *manager, cnf *theory, cutset_cache_t *cutset_cache, int total_clauses, int variable_index) {
+DdNode *cnf_to_obdd_rec(DdManager *manager, cnf *theory, cutset_cache_t *cutset_cache, int total_clauses, int *order, int order_index) {
     // printf("cnf_to_obdd_rec: variable_index = %d\n", variable_index);
     // if(variable_index > theory->n_variables) {
     //     print_cnf(theory);
     //     return;
     // }
     DdNode *result;
+    int variable_index = order[order_index]; // 1-based index
 
     if(theory->state == CNF_INCONSISTENT) {
         // print_cnf(theory);
@@ -430,8 +434,8 @@ DdNode *cnf_to_obdd_rec(DdManager *manager, cnf *theory, cutset_cache_t *cutset_
     set_variable(sub_cnf_false, variable_index, -1); // set the variable to false
 
     DdNode *true_branch, *false_branch;
-    true_branch = cnf_to_obdd_rec(manager, sub_cnf_true, cutset_cache, total_clauses, variable_index + 1);
-    false_branch = cnf_to_obdd_rec(manager, sub_cnf_false, cutset_cache, total_clauses, variable_index + 1);
+    true_branch = cnf_to_obdd_rec(manager, sub_cnf_true, cutset_cache, total_clauses, order, order_index + 1);
+    false_branch = cnf_to_obdd_rec(manager, sub_cnf_false, cutset_cache, total_clauses, order, order_index + 1);
     
     result = get_node(manager, variable_index, true_branch, false_branch);
     
@@ -450,7 +454,8 @@ DdNode *cnf_to_obdd(DdManager *DdManager, cnf *theory) {
     // implements the approach: https://users.cecs.anu.edu.au/~jinbo/04-sat.pdf
     DdNode *result;
     cutset_cache_t *cutset_cache = init_cutset_cache(theory->n_variables);
-    result = cnf_to_obdd_rec(DdManager, theory, cutset_cache, theory->n_clauses, 1);
+    int *order = compute_stats_cnf(theory);
+    result = cnf_to_obdd_rec(DdManager, theory, cutset_cache, theory->n_clauses, order, 1);
     // printf("----\n");
     // print_cutset_cache(cutset_cache);
     // printf("----\n");

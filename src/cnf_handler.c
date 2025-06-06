@@ -244,6 +244,11 @@ int *compute_stats_cnf(const cnf *theory) {
     for(int i = 1; i <= theory->n_variables; i++) {
         printf("c Variable %d: (%d,%d) = %d (%d)\n", i, term_occurrences_pos[i], term_occurrences_neg[i], term_occurrences[i], order[i]);
     }
+    printf("c Order: ");
+    for(int i = 1; i <= theory->n_variables; i++) {
+        printf("%d ", order[i]);
+    }
+    printf("\n");
     #endif
     
     free(term_occurrences_pos);
