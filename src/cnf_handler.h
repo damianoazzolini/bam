@@ -5,9 +5,14 @@ typedef struct complex_t {
     double imag;
 } complex_t;
 
-typedef union weight_t {
+typedef union weight_union {
     double real_weight;
     complex_t complex_weight;
+} weight_union;
+
+typedef struct weight_t {
+    weight_union weight;
+    int weight_type;
 } weight_t;
 
 typedef struct clause{
@@ -29,9 +34,16 @@ enum cnf_state {
     CNF_UNSOLVED = 2 // general case
 };
 
+enum variable_weight_type {
+    REAL_WEIGHT = 0,
+    COMPLEX_WEIGHT = 1
+};
+
 typedef struct cnf{
     unsigned int n_clauses;
     unsigned int n_variables;
+    unsigned int *variable_layers; // at position i we have the level of variable i
+    unsigned int n_layers; // number of AMC levels
     enum cnf_state state;
     // clause clauses[256];
     clause *clauses;
@@ -52,8 +64,8 @@ void free_var_mapping(var_mapping *var_map);
 
 void parse_cnf(char *filename, cnf *theory, var_mapping *var_map, int weight_type);
 void set_variable(cnf *theory, int idx_var, int phase);
-void print_var_mapping(const var_mapping *var_map, int weight_type);
+void print_var_mapping(const var_mapping *var_map);
 // void print_cnf_matrix(const cnf *theory);
 void print_cnf(const cnf *theory);
 int *compute_stats_cnf(const cnf *theory);
-char *get_weight_string(weight_t weight, int weight_type);
+char *get_weight_string(weight_t weight);

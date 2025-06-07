@@ -41,4 +41,4 @@ typedef struct cutset_cache_t {
 } cutset_cache_t;
 
 
-weight_t solve_with_bdd(cnf *theory, var_mapping *var_map, semiring_t semiring, int compilation_type, int weight_type);
+weight_t solve_with_bdd(cnf *theory, var_mapping *var_map, semiring_t semiring, int compilation_type);

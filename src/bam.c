@@ -40,7 +40,7 @@ weight_t cache_lookup(cache *cache_list, DdNode *node_pointer, char **set) {
         current = current->next;
     }
     
-    return (weight_t) { .real_weight = 0.0 };
+    return (weight_t) { .weight_type = -1 };
 }
 
 void print_cache(cache *cache_list) {
@@ -141,7 +141,7 @@ label traverse_bdd_aproblog_rec(DdManager *manager, DdNode *node, const var_mapp
     return result;
 }
 
-weight_t traverse_bdd_aproblog(DdManager *manager, DdNode *node, const var_mapping *var_map, const semiring_t *semiring, int weight_type) {
+weight_t traverse_bdd_aproblog(DdManager *manager, DdNode *node, const var_mapping *var_map, const semiring_t *semiring) {
     label result;
     cache **cache_list = malloc(sizeof(cache*));
     *cache_list = NULL; // Initialize the cache list
@@ -153,7 +153,7 @@ weight_t traverse_bdd_aproblog(DdManager *manager, DdNode *node, const var_mappi
     // print_cache(*cache_list);
     
     weight_t adjusted_weight = result.weight;
-    weight_string = get_weight_string(adjusted_weight, weight_type);
+    weight_string = get_weight_string(adjusted_weight);
     printf("c ADD weight: %s\n", weight_string);
     free(weight_string);
 
@@ -164,7 +164,7 @@ weight_t traverse_bdd_aproblog(DdManager *manager, DdNode *node, const var_mappi
             current_weight_false = semiring->mul(var_map->variables_mappings[i].weight_false, adjusted_weight);
             adjusted_weight = semiring->add(current_weight_true, current_weight_false);
 
-            weight_string = get_weight_string(adjusted_weight, weight_type);
+            weight_string = get_weight_string(adjusted_weight);
             printf("c Variable %d is not in the set, adjusting weight: %s\n", i, weight_string);
             free(weight_string);
         }
@@ -477,7 +477,7 @@ void reorder_bdd(DdManager *manager, const cnf *theory, DdNode *f) {
     free(order);
 }
 
-weight_t solve_with_bdd(cnf *theory, var_mapping *var_map, semiring_t semiring, int compilation_type, int weight_type) {
+weight_t solve_with_bdd(cnf *theory, var_mapping *var_map, semiring_t semiring, int compilation_type) {
     DdManager *manager;
     DdNode *f = NULL;
     weight_t res;
@@ -554,18 +554,18 @@ weight_t solve_with_bdd(cnf *theory, var_mapping *var_map, semiring_t semiring, 
     printf("c Traversing the ADD\n");
     // label res_label;
     begin = clock();
-    res = traverse_bdd_aproblog(manager, add_root, var_map, &semiring, weight_type);
+    res = traverse_bdd_aproblog(manager, add_root, var_map, &semiring);
     // printf("Weight: %lf\n", res_label.weight);
     end = clock();
     time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
     printf("c Time spent traversing the ADD: %lf seconds\n", time_spent);
     // res = traverse_bdd_amc(manager, f, var_map, &semiring); /* Traverse the BDD and print the minterms */
 
-    char *weight_string = get_weight_string(res, weight_type);
+    char *weight_string = get_weight_string(res);
     printf("c Final weight\n");
     printf("c ==============================\n");
-    if(weight_type == 0) {
-        printf("c s log10-estimate %lf\n", log10(res.real_weight));
+    if(res.weight_type == 0) {
+        printf("c s log10-estimate %lf\n", log10(res.weight.real_weight));
     }
     // printf("c s log10-estimate %lf\n", log10(res.real_weight));
     printf("c s exact double float %s\n", weight_string);
@@ -581,7 +581,7 @@ int main(int argc, char *argv[]) {
     cnf *theory = init_cnf();
     var_mapping *var_map = init_var_mapping();
     semiring_t semiring = prob_semiring(0); // max_times_semiring();
-    int weight_type = 0; // 0 for real, 1 for complex
+    int weight_type = REAL_WEIGHT;
 
     int compilation_type = 1; // 0 monolithic, 1 cutset
 
@@ -601,22 +601,22 @@ int main(int argc, char *argv[]) {
             return -1;
         }
         if (strcmp(argv[4], "max_times") == 0) {
-            weight_type = 0;
+            weight_type = REAL_WEIGHT;
             semiring = max_times_semiring();
         }
         if (strcmp(argv[4], "complex_max_times") == 0) {
-            weight_type = 1;
+            weight_type = COMPLEX_WEIGHT;
             semiring = max_times_semiring();
         }
         else if (strcmp(argv[4], "min_times") == 0) {
             semiring = min_times_semiring();
         }
         else if (strcmp(argv[4], "prob") == 0) {
-            weight_type = 0;
+            weight_type = REAL_WEIGHT;
             semiring = prob_semiring(0);
         }
         else if (strcmp(argv[4], "complex_prob") == 0) {
-            weight_type = 1;
+            weight_type = COMPLEX_WEIGHT;
             semiring = prob_semiring(1);
         }
         else {
@@ -637,7 +637,7 @@ int main(int argc, char *argv[]) {
 
     #ifdef DEBUG_MODE
     // print_var_mapping(var_map, weight_type);
-    // print_cnf(theory);
+    print_cnf(theory);
     // compute_stats_cnf(theory);
     #endif
     
@@ -647,7 +647,7 @@ int main(int argc, char *argv[]) {
     // print_cnf(theory);
     
 
-    solve_with_bdd(theory, var_map, semiring, compilation_type, weight_type);
+    solve_with_bdd(theory, var_map, semiring, compilation_type);
 
     free_cnf(theory);
     free_var_mapping(var_map);

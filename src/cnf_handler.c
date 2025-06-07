@@ -7,9 +7,10 @@ cnf *init_cnf() {
     cnf *theory = malloc(sizeof(cnf));
     theory->n_clauses = 0;
     theory->n_variables = 0;
+    theory->variable_layers = NULL;
+    theory->n_layers = 1;
     theory->state = CNF_UNSOLVED;
     theory->clauses = NULL;
-    // theory->matrix_representation = NULL;
     return theory;
 }
 
@@ -19,20 +20,18 @@ void free_cnf(cnf *theory) {
             free(theory->clauses[i].terms);
         }
         free(theory->clauses);
-        // for (unsigned int i = 0; i < theory->n_variables; i++) {
-        //     // free(theory->matrix_representation[i]);
-        // }
+        free(theory->variable_layers);
         free(theory);
     }
 }
 
-char *get_weight_string(weight_t weight, int weight_type) {
+char *get_weight_string(weight_t weight) {
     char *weight_str = malloc(32 * sizeof(char));
-    if(weight_type == 0) {
-        snprintf(weight_str, 32, "%lf", weight.real_weight);
+    if(weight.weight_type == REAL_WEIGHT) {
+        snprintf(weight_str, 32, "%lf", weight.weight.real_weight);
     }
-    else if(weight_type == 1) {
-        snprintf(weight_str, 32, "%lf+%lfi", weight.complex_weight.real, weight.complex_weight.imag);
+    else if(weight.weight_type == COMPLEX_WEIGHT) {
+        snprintf(weight_str, 32, "%lf+%lfi", weight.weight.complex_weight.real, weight.weight.complex_weight.imag);
     }
     return weight_str;
 }
@@ -53,6 +52,13 @@ void print_cnf(const cnf *theory) {
         printf("Clause %d with %d terms: ", i, theory->clauses[i].n_terms);
         for (unsigned int j = 0; j < theory->clauses[i].n_terms; j++) {
             printf("%d ", theory->clauses[i].terms[j]);
+        }
+        printf("\n");
+    }
+    if(theory->n_layers > 1) {
+        printf("Variable layers: ");
+        for(unsigned int i = 1; i <= theory->n_variables; i++) {
+            printf("%d ", theory->variable_layers[i]);
         }
         printf("\n");
     }
@@ -143,11 +149,11 @@ void free_var_mapping(var_mapping *var_map) {
     }
 }
 
-void print_var_mapping(const var_mapping *var_map, int weight_type) {
+void print_var_mapping(const var_mapping *var_map) {
     char *weight_true_string, *weight_false_string;
     for(int i = 1; i < var_map->n_variables_mappings; i++) {
-        weight_true_string = get_weight_string(var_map->variables_mappings[i].weight_true, weight_type);
-        weight_false_string = get_weight_string(var_map->variables_mappings[i].weight_false, weight_type);
+        weight_true_string = get_weight_string(var_map->variables_mappings[i].weight_true);
+        weight_false_string = get_weight_string(var_map->variables_mappings[i].weight_false);
         printf("Variable %d: %s, %s\n", i, weight_true_string, weight_false_string);
         free(weight_true_string);
         free(weight_false_string);
@@ -161,28 +167,29 @@ int read_weight_line(char *line, var_mapping *var_map, int num_vars, int type, i
     // type 1: c p weight ID WEIGHT 0
     int idx_var = 0, index_var, n_read = 0;
     weight_t weight;
+    weight.weight_type = weight_type;
     if(type == 0) {
-        if(weight_type == 0) {
-            n_read = sscanf(line, "%*s %d %lf", &idx_var, &weight.real_weight);
+        if(weight_type == REAL_WEIGHT) {
+            n_read = sscanf(line, "%*s %d %lf", &idx_var, &weight.weight.real_weight);
         }
-        else if(weight_type == 1) {
+        else if(weight_type == COMPLEX_WEIGHT) {
             char imag_weight_s[16];
-            n_read = sscanf(line, "%*s %d %lf+%s", &idx_var, &weight.complex_weight.real, imag_weight_s);
-            weight.complex_weight.imag = atof(imag_weight_s);
+            n_read = sscanf(line, "%*s %d %lf+%s", &idx_var, &weight.weight.complex_weight.real, imag_weight_s);
+            weight.weight.complex_weight.imag = atof(imag_weight_s);
         }
     }
     else if(type == 1) {
-        if(weight_type == 0) {
-            n_read = sscanf(line, "%*s %*s %*s %d %lf %*d", &idx_var, &weight.real_weight);
+        if(weight_type == REAL_WEIGHT) {
+            n_read = sscanf(line, "%*s %*s %*s %d %lf %*d", &idx_var, &weight.weight.real_weight);
         }
-        else if(weight_type == 1) {
+        else if(weight_type == COMPLEX_WEIGHT) {
             char imag_weight_s[16];
-            n_read = sscanf(line, "%*s %*s %*s %d %lf+%s %*d", &idx_var, &weight.complex_weight.real, imag_weight_s);
-            weight.complex_weight.imag = atof(imag_weight_s);
+            n_read = sscanf(line, "%*s %*s %*s %d %lf+%s %*d", &idx_var, &weight.weight.complex_weight.real, imag_weight_s);
+            weight.weight.complex_weight.imag = atof(imag_weight_s);
         }
     }
 
-    if(weight_type == 0 && n_read != 2 || weight_type == 1 && n_read != 3) {
+    if(weight_type == REAL_WEIGHT && n_read != 2 || weight_type == COMPLEX_WEIGHT && n_read != 3) {
         return -1;
     }
 
@@ -306,6 +313,7 @@ void parse_cnf(char *filename, cnf *theory, var_mapping *var_map, int weight_typ
             // }
             var_map->variables_mappings = malloc((num_vars + 1) * sizeof(var));
             var_map->n_variables_mappings = num_vars + 1;
+            theory->variable_layers = calloc((num_vars + 1), sizeof(unsigned int));
         }
         else if (line[0] == 'w') {
             // w ID WEIGHT
@@ -333,6 +341,32 @@ void parse_cnf(char *filename, cnf *theory, var_mapping *var_map, int weight_typ
             //     return;
             // }
             // printf("Semiring: %s\n", task);
+        }
+        else if(line[0] == 'c' && line[1] == ' ' && line[2] == 'l' && line[3] == ' ') {
+            // level line
+            // c l ID L 0
+            int level;
+            int var_id;
+            n_read = sscanf(line, "%*s %*s %d %d", &var_id, &level);
+            if(n_read != 2) {
+                fprintf(stderr, "Error parsing line: %s\n", line);
+                fclose(fp);
+                exit(-1);
+            }
+            if(var_id < 1 || var_id > theory->n_variables) {
+                fprintf(stderr, "Error: variable ID %d out of bounds (1 to %d)\n", var_id, theory->n_variables);
+                fclose(fp);
+                exit(-1);
+            }
+            if(level < 1) {
+                fprintf(stderr, "Level must be positive: %s\n", line);
+                fclose(fp);
+                exit(-1);
+            }
+            theory->variable_layers[var_id] = level;
+            if(theory->n_layers < level) {
+                theory->n_layers = level;
+            }
         }
         else if(line[0] == 'c') {
             // This is a comment line, ignore it

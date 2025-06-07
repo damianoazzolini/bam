@@ -5,32 +5,54 @@
 #include "cnf_handler.h"
 
 weight_t mul(weight_t a, weight_t b) {
-    return (weight_t) (a.real_weight * b.real_weight);
+    weight_t result;
+    result.weight_type = a.weight_type;
+    if(a.weight_type == REAL_WEIGHT) { // real
+        result.weight.real_weight = a.weight.real_weight * b.weight.real_weight;
+    }
+    else if(a.weight_type == COMPLEX_WEIGHT) { // complex
+        result.weight.complex_weight.real = a.weight.complex_weight.real * b.weight.complex_weight.real - a.weight.complex_weight.imag * b.weight.complex_weight.imag;
+        result.weight.complex_weight.imag = a.weight.complex_weight.real * b.weight.complex_weight.imag + a.weight.complex_weight.imag * b.weight.complex_weight.real;
+    }
+    return result;
 }
-weight_t mul_complex(weight_t a, weight_t b) {
-    return (weight_t) {
-        .complex_weight = {
-            .real = a.complex_weight.real * b.complex_weight.real - a.complex_weight.imag * b.complex_weight.imag,
-            .imag = a.complex_weight.real * b.complex_weight.imag + a.complex_weight.imag * b.complex_weight.real
-        }
-    };
-}
+
 weight_t add(weight_t a, weight_t b) {
-    return (weight_t) (a.real_weight + b.real_weight);
+    weight_t result;
+    result.weight_type = a.weight_type;
+    if(a.weight_type == REAL_WEIGHT) {
+        result.weight.real_weight = a.weight.real_weight + b.weight.real_weight;
+    }
+    else if(a.weight_type == COMPLEX_WEIGHT) {
+        result.weight.complex_weight.real = a.weight.complex_weight.real + b.weight.complex_weight.real;
+        result.weight.complex_weight.imag = a.weight.complex_weight.imag + b.weight.complex_weight.imag;
+    }
+    return result;
 }
-weight_t add_complex(weight_t a, weight_t b) {
-    return (weight_t) {
-        .complex_weight = {
-            .real = a.complex_weight.real + b.complex_weight.real,
-            .imag = a.complex_weight.imag + b.complex_weight.imag
-        }
-    };
-}
+
 weight_t max(weight_t a, weight_t b) {
-    return (weight_t) (a.real_weight > b.real_weight ? a.real_weight : b.real_weight);
+    weight_t result;
+    result.weight_type = a.weight_type;
+    if(a.weight_type == REAL_WEIGHT) {
+        result.weight.real_weight = a.weight.real_weight > b.weight.real_weight ? a.weight.real_weight : b.weight.real_weight;
+    }
+    else if(a.weight_type == COMPLEX_WEIGHT) { // is this correct?
+        result.weight.complex_weight.real = a.weight.complex_weight.real > b.weight.complex_weight.real ? a.weight.complex_weight.real : b.weight.complex_weight.real;
+        result.weight.complex_weight.imag = a.weight.complex_weight.imag > b.weight.complex_weight.imag ? a.weight.complex_weight.imag : b.weight.complex_weight.imag;
+    }
+    return result;
 }
 weight_t min(weight_t a, weight_t b) {
-    return (weight_t) (a.real_weight < b.real_weight ? a.real_weight : b.real_weight);
+    weight_t result;
+    result.weight_type = a.weight_type;
+    if(a.weight_type == REAL_WEIGHT) {
+        result.weight.real_weight = a.weight.real_weight < b.weight.real_weight ? a.weight.real_weight : b.weight.real_weight;
+    }
+    else if(a.weight_type == COMPLEX_WEIGHT) { // is this correct
+        result.weight.complex_weight.real = a.weight.complex_weight.real < b.weight.complex_weight.real ? a.weight.complex_weight.real : b.weight.complex_weight.real;
+        result.weight.complex_weight.imag = a.weight.complex_weight.imag < b.weight.complex_weight.imag ? a.weight.complex_weight.imag : b.weight.complex_weight.imag;
+    }
+    return result;
 }
 
 // coordinate-wise operations
@@ -59,30 +81,36 @@ double* grad_two(double *a, double *b) {
 // one variable semirings
 semiring_t prob_semiring(int weight_type) {
     semiring_t semiring;
-    if(weight_type == 0) {
-        // real weights
-        weight_t neutral_add = { .real_weight = 0.0 };
-        weight_t neutral_mul = { .real_weight = 1.0 };
-        semiring.add = add;
-        semiring.mul = mul;
-        semiring.neutral_add = neutral_add;
-        semiring.neutral_mul = neutral_mul;
-    } else {
-        // complex weights
-        weight_t neutral_add = { .complex_weight = { .real = 0.0, .imag = 0.0 } };
-        weight_t neutral_mul = { .complex_weight = { .real = 1.0, .imag = 0.0 } };
-        semiring.add = add_complex;
-        semiring.mul = mul_complex;
+    weight_t neutral_add, neutral_mul;
+    
+    if(weight_type == REAL_WEIGHT) {
+        neutral_add.weight.real_weight = 0.0;
+        neutral_mul.weight.real_weight = 1.0;
         semiring.neutral_add = neutral_add;
         semiring.neutral_mul = neutral_mul;
     }
+    else if(weight_type == COMPLEX_WEIGHT) {
+        neutral_add.weight.complex_weight.real = 0.0;
+        neutral_add.weight.complex_weight.imag = 0.0;
+        neutral_mul.weight.complex_weight.real = 1.0;
+        neutral_mul.weight.complex_weight.imag = 0.0;
+        semiring.neutral_add = neutral_add;
+        semiring.neutral_mul = neutral_mul;
+    }
+    neutral_add.weight_type = weight_type;
+    neutral_mul.weight_type = weight_type;
+    semiring.add = add;
+    semiring.mul = mul;
     return semiring;
 }
 
 semiring_t min_max_semiring_wrap(weight_t (*fn)(weight_t, weight_t)) {
     semiring_t semiring;
-    weight_t neutral_add = { .real_weight = 0.0 };
-    weight_t neutral_mul = { .real_weight = 1.0 };
+    weight_t neutral_add, neutral_mul;
+    neutral_add.weight_type = REAL_WEIGHT;
+    neutral_mul.weight_type = REAL_WEIGHT;
+    neutral_add.weight.real_weight = 0.0;
+    neutral_mul.weight.real_weight = 1.0;
     semiring.add = fn;
     semiring.mul = mul;
     semiring.neutral_add = neutral_add;
@@ -95,46 +123,62 @@ semiring_t max_times_semiring() {
 semiring_t min_times_semiring() {
     return min_max_semiring_wrap(min);
 }
-semiring_t max_plus_semiring_() {
-    semiring_t semiring;
-    weight_t neutral_add = { .real_weight = -MY_INFINITY };
-    weight_t neutral_mul = { .real_weight = 0.0 };
-    semiring.add = max;
-    semiring.mul = add;
-    semiring.neutral_add = neutral_add;
-    semiring.neutral_mul = neutral_mul;
+// semiring_t max_plus_semiring_() {
+//     semiring_t semiring;
+//     weight_t neutral_add = { .real_weight = -MY_INFINITY };
+//     weight_t neutral_mul = { .real_weight = 0.0 };
+//     semiring.add = max;
+//     semiring.mul = add;
+//     semiring.neutral_add = neutral_add;
+//     semiring.neutral_mul = neutral_mul;
+//     return semiring;
+// }
+
+weight_t identity_function(weight_t w) {
+    return w;
+}
+
+semiring_nested_t max_times_add_times_semiring() {
+    semiring_nested_t semiring;
+    semiring.n_semirings = 2;
+    semiring.semirings = malloc(2 * sizeof(semiring_t));
+    semiring.semirings[0] = prob_semiring(0); // innermost
+    semiring.semirings[1] = max_times_semiring();
+    // malloc an array of function pointers for transformation functions
+    semiring.transformation_functions = malloc(sizeof(fnc_ptr_t));
+    semiring.transformation_functions[0] = identity_function;
     return semiring;
 }
 
-// two variables semirings
-semiring_two_t expected_utility_semiring() {
-    semiring_two_t semiring;
-    semiring.add = add_two;
-    semiring.mul = grad_two;
-    semiring.neutral_add[0] = 0.0;
-    semiring.neutral_add[1] = 0.0;
-    semiring.neutral_mul[0] = 1.0;
-    semiring.neutral_mul[1] = 0.0;
-    return semiring;
-}
-semiring_two_t add_mul_two() {
-    semiring_two_t semiring;
-    semiring.add = add_two;
-    semiring.mul = mul_two;
-    semiring.neutral_add[0] = 0.0;
-    semiring.neutral_add[1] = 0.0;
-    semiring.neutral_mul[0] = 1.0;
-    semiring.neutral_mul[1] = 1.0;
-    return semiring;
-}
-semiring_two_t stable_models_semiring() {
-    // for PASP or smProbLog
-    return add_mul_two();
-}
-semiring_two_t prob_two_semiring() {
-    // same as before but separated for clarity
-    return add_mul_two();
-}
+// // two variables semirings
+// semiring_two_t expected_utility_semiring() {
+//     semiring_two_t semiring;
+//     semiring.add = add_two;
+//     semiring.mul = grad_two;
+//     semiring.neutral_add[0] = 0.0;
+//     semiring.neutral_add[1] = 0.0;
+//     semiring.neutral_mul[0] = 1.0;
+//     semiring.neutral_mul[1] = 0.0;
+//     return semiring;
+// }
+// semiring_two_t add_mul_two() {
+//     semiring_two_t semiring;
+//     semiring.add = add_two;
+//     semiring.mul = mul_two;
+//     semiring.neutral_add[0] = 0.0;
+//     semiring.neutral_add[1] = 0.0;
+//     semiring.neutral_mul[0] = 1.0;
+//     semiring.neutral_mul[1] = 1.0;
+//     return semiring;
+// }
+// semiring_two_t stable_models_semiring() {
+//     // for PASP or smProbLog
+//     return add_mul_two();
+// }
+// semiring_two_t prob_two_semiring() {
+//     // same as before but separated for clarity
+//     return add_mul_two();
+// }
 
 // transformation functions
 double *transformation_function_credal(double *pair) {
