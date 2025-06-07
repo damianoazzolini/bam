@@ -1,5 +1,6 @@
 // #pragma once
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "semiring.h"
 #include "cnf_handler.h"
@@ -82,6 +83,8 @@ double* grad_two(double *a, double *b) {
 semiring_t prob_semiring(int weight_type) {
     semiring_t semiring;
     weight_t neutral_add, neutral_mul;
+    neutral_add.weight_type = weight_type;
+    neutral_mul.weight_type = weight_type;
     
     if(weight_type == REAL_WEIGHT) {
         neutral_add.weight.real_weight = 0.0;
@@ -97,8 +100,6 @@ semiring_t prob_semiring(int weight_type) {
         semiring.neutral_add = neutral_add;
         semiring.neutral_mul = neutral_mul;
     }
-    neutral_add.weight_type = weight_type;
-    neutral_mul.weight_type = weight_type;
     semiring.add = add;
     semiring.mul = mul;
     return semiring;

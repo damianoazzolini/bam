@@ -56,6 +56,7 @@ void print_cnf(const cnf *theory) {
         printf("\n");
     }
     if(theory->n_layers > 1) {
+        printf("Number of layers: %d\n", theory->n_layers);
         printf("Variable layers: ");
         for(unsigned int i = 1; i <= theory->n_variables; i++) {
             printf("%d ", theory->variable_layers[i]);

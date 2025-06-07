@@ -21,3 +21,5 @@ src/old_traverse.c
 k.py
 run_valgrind.sh
 notes.txt
+test_cnf_handler
+test_integration

@@ -16,12 +16,21 @@ endif
 
 all: bam
 
-bam: bam.o cnf_handler.o semiring.o
-	gcc bam.o cnf_handler.o semiring.o $(LDFLAGS) -o bam -lm
+bam: bam.o cnf_handler.o semiring.o tree_traversal.o tree_build.o solver.o
+	cd cudd && $(MAKE) && cd ..
+	gcc bam.o cnf_handler.o semiring.o tree_traversal.o tree_build.o solver.o $(LDFLAGS) -o bam -lm
 
-bam.o : src/bam.c src/bam.h src/cnf_handler.h src/semiring.h
-	cd cudd &&  $(MAKE) && cd ..
+bam.o : src/bam.c src/solver.h src/cnf_handler.h src/semiring.h src/tree_traversal.h src/tree_build.h
 	gcc -c $(CFLAGSprog) $(FLAGS) src/bam.c -o bam.o
+
+solver.o: src/solver.c src/solver.h src/cnf_handler.h src/semiring.h src/tree_traversal.h src/tree_build.h
+	gcc -c $(CFLAGSprog) $(FLAGS) src/solver.c -o solver.o
+
+tree_traversal.o: src/tree_traversal.c src/tree_traversal.h src/cnf_handler.h src/semiring.h
+	gcc -c $(CFLAGSprog) $(FLAGS) src/tree_traversal.c -o tree_traversal.o
+
+tree_build.o: src/tree_build.c src/tree_build.h
+	gcc -c $(CFLAGSprog) $(FLAGS) src/tree_build.c -o tree_build.o
 
 cnf_handler.o: src/cnf_handler.c src/cnf_handler.h
 	gcc -c $(CFLAGSprog) $(FLAGS) src/cnf_handler.c -o cnf_handler.o
@@ -40,10 +49,10 @@ test_cnf_handler: test_cnf_handler.o cnf_handler.o
 test_cnf_handler.o: tests/test_cnf_handler.c src/cnf_handler.h
 	gcc -c $(CFLAGSprog) $(FLAGS) tests/test_cnf_handler.c -o test_cnf_handler.o
 
-test_integration: test_integration.o bam.o cnf_handler.o semiring.o
-	gcc test_integration.o bam.o cnf_handler.o semiring.o $(LDFLAGS) -o test_integration -lm
+test_integration: test_integration.o solver.o cnf_handler.o semiring.o tree_traversal.o tree_build.o
+	gcc test_integration.o solver.o cnf_handler.o semiring.o tree_traversal.o tree_build.o $(LDFLAGS) -o test_integration -lm
 
-test_integration.o: tests/test_integration.c src/bam.h
+test_integration.o: tests/test_integration.c src/solver.h src/cnf_handler.h src/semiring.h src/tree_traversal.h src/tree_build.h
 	gcc -c $(CFLAGSprog) $(FLAGS) tests/test_integration.c -o test_integration.o
 
 # cleaning
